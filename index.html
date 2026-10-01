@@ -35,13 +35,6 @@
 
   <link rel="icon" type="image/svg+xml" href="assets/4fb1d8a3-8728-4e93-9d88-c053d96d4372.svg">
 
-  <!-- Preload critical images for smooth cross-fade -->
-  <link rel="preload" as="image" href="assets/images/Exterior.png">
-  <link rel="preload" as="image" href="assets/images/Concourse level.png">
-  <link rel="preload" as="image" href="assets/images/Vertical Transition.png">
-  <link rel="preload" as="image" href="assets/images/Aerial.png">
-  <link rel="preload" as="image" href="assets/images/Platfrom Level.png">
-
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <style>/* cyrillic-ext */
@@ -2228,8 +2221,8 @@ function initSectionObserver() {
   const sections = Array.from(document.querySelectorAll('[data-bg]'));
   if (!sections.length) return () => {};
 
-  /* Preload all section images immediately */
-  sections.forEach(s => { if (s.dataset.bg) scene.preload(s.dataset.bg); });
+  /* Section images are not preloaded: .scene-bg is display:none, so
+     they are never shown and cost ~10 MB of PNG for nothing */
 
   const wayfindingLabels = Array.from(document.querySelectorAll('.wayfinding__label'));
   const navLinks = Array.from(document.querySelectorAll('.nav__links a[href^="#"]'));
@@ -3326,12 +3319,9 @@ function __boot() {
     initHeroRays(),
   ]);
 
-  /* Preloader counts the station in, then the entrance sequence
-     resolves the hero from darkness and the stats roll up */
-  initPreloader(() => {
-    initHeroEntrance();
-    setTimeout(initStatCounters, 1600);
-  });
+  /* The scroll-scrub engine's #sw-loading is the single loader;
+     the old timed counter only stacked a second screen on top */
+  document.getElementById('preloader')?.remove();
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', __boot);
@@ -3396,10 +3386,11 @@ if (document.readyState === 'loading') {
         this._c=cache;this._res=res;
         this._base=base.endsWith("/")?base:base+"/";
         this._sc=new Map();
+        this._wq=[];this._wa=0;
       }
       reg(m){
         if(this._sc.has(m.id))return;
-        this._sc.set(m.id,{m,pend:new Set(),hero:null,heroOk:false,loaded:0,done:false,onProg:null});
+        this._sc.set(m.id,{m,pend:new Set(),cbs:{},hero:null,heroOk:false,warmed:false});
       }
       async hero(id){
         const s=this._sc.get(id);if(!s||s.heroOk)return null;
@@ -3411,10 +3402,28 @@ if (document.readyState === 'loading') {
           i.onerror=()=>ok(null);
         });
       }
-      preloadAll(id,onProg){
-        const s=this._sc.get(id);if(!s||s.done)return;
-        s.onProg=onProg??null;
-        for(let i=0;i<s.m.totalFrames;i++)this._req(s,i);
+      /* Decode the first n frames of a scene — gates the loading screen */
+      preloadFirst(id,n,onProg){
+        const s=this._sc.get(id);if(!s)return;
+        const t=Math.min(n,s.m.totalFrames);let got=0;
+        for(let i=0;i<t;i++)this._req(s,i,()=>{got++;onProg?.(got,t);});
+      }
+      /* Download (not decode) a scene into the HTTP cache, a few requests
+         at a time, so later decodes in prefetch() are disk-cache hits.
+         Bytes scale with how far the visitor actually scrolls. */
+      warm(id){
+        const s=this._sc.get(id);if(!s||s.warmed)return;
+        s.warmed=true;
+        for(let i=0;i<s.m.totalFrames;i++)this._wq.push(this._src(s,i));
+        this._pump();
+      }
+      _pump(){
+        while(this._wa<3&&this._wq.length){
+          const src=this._wq.shift();if(!src)continue;
+          this._wa++;
+          fetch(src,{priority:"low"}).then(r=>r.blob()).catch(()=>{})
+            .finally(()=>{this._wa--;this._pump();});
+        }
       }
       prefetch(id,fi,ahead=12,behind=4){
         const s=this._sc.get(id);if(!s)return;
@@ -3423,17 +3432,30 @@ if (document.readyState === 'loading') {
         for(let i=Math.max(0,fi-behind);i<=Math.min(t-1,fi+ahead);i++)this._req(s,i);
       }
       bm(id,fi){return this._c.get(`${id}:${fi}`);}
+      /* Closest decoded frame within r of fi — avoids snapping back to
+         the scene's hero image while a fast scroll outruns decoding */
+      near(id,fi,r=30){
+        for(let d=1;d<=r;d++){
+          const a=this._c.get(`${id}:${fi-d}`);if(a)return a;
+          const b=this._c.get(`${id}:${fi+d}`);if(b)return b;
+        }
+        return null;
+      }
       heroEl(id){return this._sc.get(id)?.hero??null;}
-      _req(s,idx){
+      _src(s,idx){
+        const fr=s.m.frames[idx];if(!fr)return null;
+        return this._resolve(fr.assets[this._res]??fr.assets.sm);
+      }
+      _req(s,idx,cb){
         const k=`${s.m.id}:${idx}`;
-        if(this._c.has(k)||s.pend.has(idx))return;
-        const fr=s.m.frames[idx];if(!fr)return;
+        if(this._c.has(k)){cb?.();return;}
+        if(s.pend.has(idx)){if(cb)(s.cbs[idx]??=[]).push(cb);return;}
+        const src=this._src(s,idx);if(!src){cb?.();return;}
         s.pend.add(idx);
-        const src=this._resolve(fr.assets[this._res]??fr.assets.sm);
+        if(cb)(s.cbs[idx]??=[]).push(cb);
         const done=()=>{
-          s.pend.delete(idx);s.loaded++;
-          s.onProg?.(s.loaded,s.m.totalFrames);
-          if(s.loaded>=s.m.totalFrames)s.done=true;
+          s.pend.delete(idx);
+          const q=s.cbs[idx];if(q){delete s.cbs[idx];q.forEach(f=>f());}
         };
         fetch(src)
           .then(r=>{if(!r.ok)throw r.status;return r.blob();})
@@ -3483,18 +3505,22 @@ if (document.readyState === 'loading') {
        drawImage() call copies the finished frame to the visible canvas.
        This ensures the visitor never sees a half-drawn frame. ── */
     class Renderer {
-      constructor(cv){
+      constructor(cv,srcW=1920){
         this._cv=cv;
         this._ctx=cv.getContext("2d",{alpha:false});
         /* Offscreen canvas — same size, composited here first */
         this._off=new OffscreenCanvas(1,1);
         this._octx=this._off.getContext("2d",{alpha:false});
-        this._dpr=Math.min(window.devicePixelRatio||1,2);
+        this._srcW=srcW;
         this._lk="";
       }
       resize(){
-        const w=Math.round(window.innerWidth*this._dpr);
-        const h=Math.round(window.innerHeight*this._dpr);
+        /* No sharper than the source frames: a canvas wider than the
+           cover-scaled frame only adds fill cost on retina screens */
+        const need=Math.max(window.innerWidth,window.innerHeight*16/9);
+        const dpr=Math.min(window.devicePixelRatio||1,2,Math.max(1,this._srcW/need));
+        const w=Math.round(window.innerWidth*dpr);
+        const h=Math.round(window.innerHeight*dpr);
         if(this._cv.width===w&&this._cv.height===h)return;
         this._cv.width=w;this._cv.height=h;
         this._off.width=w;this._off.height=h;
@@ -3587,9 +3613,20 @@ if (document.readyState === 'loading') {
       const manifest=await res.json();
       const scenes=manifest.scenes;
 
-      const cache=new LRU(320);
-      const loader=new Loader(cache,"lg","./");
-      const renderer=new Renderer($cv);
+      /* Pick frame size for this device. Cover-fit needs the frame to span
+         max(width, height×16/9) CSS px. Phones, slow links and Save-Data get
+         md (960×540, ~2 MB decoded); large screens get lg (~8 MB decoded).
+         Cache cap keeps decoded memory near 200–330 MB instead of GBs. */
+      const conn=navigator.connection||{};
+      const slow=conn.saveData||/(^|-)2g$/.test(conn.effectiveType||"");
+      const coarse=window.matchMedia("(pointer: coarse)").matches;
+      const needPx=Math.max(window.innerWidth,window.innerHeight*16/9)*Math.min(window.devicePixelRatio||1,1.5);
+      const frameRes=slow?"sm":(coarse||needPx<=1100)?"md":"lg";
+      const SRC_W={sm:480,md:960,lg:1920}[frameRes];
+
+      const cache=new LRU(frameRes==="lg"?40:90);
+      const loader=new Loader(cache,frameRes,"./");
+      const renderer=new Renderer($cv,SRC_W);
       const scrubber=new Scrubber(manifest,$spacer);
 
       for(const sc of scenes)loader.reg(sc);
@@ -3602,25 +3639,28 @@ if (document.readyState === 'loading') {
       const h0=await loader.hero(scenes[0].id);
       if(h0)renderer.drawHero(h0);
 
-      /* Preload scene 0 frames, update loading bar */
-      loader.preloadAll(scenes[0].id,(loaded,total)=>{
+      /* Gate the loading screen on the opening frames only; the rest
+         stream in around the playhead. A stalled network reveals anyway. */
+      let revealed=false;
+      const reveal=()=>{
+        if(revealed)return;revealed=true;
+        $bar.style.width="100%";
+        $load.classList.add("fade");
+        setTimeout(()=>hd($load),1300);
+        setTimeout(()=>{
+          fl($prog);fl($dots);fl($hint);
+          $hint.style.opacity="1";
+        },900);
+        for(let i=1;i<scenes.length;i++)loader.hero(scenes[i].id);
+        loader.warm(scenes[0].id);
+      };
+      loader.preloadFirst(scenes[0].id,24,(loaded,total)=>{
         const pct=((loaded/total)*100).toFixed(0);
         $bar.style.width=pct+"%";
         $lbl.textContent=pct+"%";
-        if(loaded>=total){
-          $load.classList.add("fade");
-          setTimeout(()=>hd($load),1300);
-          setTimeout(()=>{
-            fl($prog);fl($dots);fl($hint);
-            $hint.style.opacity="1";
-          },900);
-          /* Background-load remaining scenes */
-          for(let i=1;i<scenes.length;i++){
-            loader.hero(scenes[i].id);
-            loader.preloadAll(scenes[i].id,null);
-          }
-        }
+        if(loaded>=total)reveal();
       });
+      setTimeout(reveal,8000);
 
       window.addEventListener("resize",()=>{renderer.resize();renderer.invalidate();},{passive:true});
 
@@ -3682,12 +3722,12 @@ if (document.readyState === 'loading') {
         const{si,sp,rfi,vel,gp}=pos;
         const sc=scenes[si];
 
-        /* Scene change — pre-load next scene */
+        /* Scene change — download (not decode) current + next scene */
         if(si!==lastSi){
           lastSi=si;
-          if(si+1<scenes.length&&!scenes[si+1]._pre){
-            scenes[si+1]._pre=true;
-            loader.preloadAll(scenes[si+1].id,null);
+          if(revealed){
+            loader.warm(sc.id);
+            if(si+1<scenes.length)loader.warm(scenes[si+1].id);
           }
         }
 
@@ -3698,11 +3738,14 @@ if (document.readyState === 'loading') {
 
         const f0=loader.bm(sc.id,i0);
         const f1=loader.bm(sc.id,i1);
-        const hero=loader.heroEl(sc.id);
 
         const key=`${sc.id}:${i0}:${frac.toFixed(2)}`;
         if(f0) renderer.draw(f0,f1,frac,key);
-        else if(hero) renderer.drawHero(hero);
+        else{
+          const nf=loader.near(sc.id,i0);
+          if(nf) renderer.draw(nf,null,0,`${sc.id}:~${i0}`);
+          else{const hero=loader.heroEl(sc.id);if(hero)renderer.drawHero(hero);}
+        }
 
         loader.prefetch(sc.id,i0,14,6);
         $pFill.style.width=(rawGp*100).toFixed(2)+"%";
@@ -3727,9 +3770,14 @@ if (document.readyState === 'loading') {
       rafId=requestAnimationFrame(tick);
     }
 
+    /* If the intro can't start (manifest unreachable, file:// preview, bad
+       deploy), never trap the visitor on the loader — drop the intro and
+       land them on the portfolio */
     main().catch(err=>{
       console.error("[SpatialStories]",err);
-      $lbl.textContent="Error: "+err.message;
+      [$load,$cv,$vig,$grain,$prog,$dots,$hint,$spacer].forEach(el=>{ if(el)hd(el); });
+      document.body.classList.remove("intro-active");
+      window.scrollTo(0,0);
     });
 
   </script>
