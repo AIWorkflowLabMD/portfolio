@@ -11,11 +11,13 @@
   <meta property="og:url" content="https://aiworkflowlabmd.github.io/portfolio/">
   <meta property="og:title" content="Michael Daimei — Transit Architect &amp; BIM Leader">
   <meta property="og:description" content="Architecture. Infrastructure. Digital Delivery.">
-  <meta property="og:image" content="https://aiworkflowlabmd.github.io/portfolio/assets/images/hero-exterior.webp">
+  <meta property="og:image" content="https://aiworkflowlabmd.github.io/portfolio/assets/images/og-cover.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Michael Daimei — Transit Architect &amp; BIM Leader">
-  <meta name="twitter:image" content="https://aiworkflowlabmd.github.io/portfolio/assets/images/hero-exterior.webp">
+  <meta name="twitter:image" content="https://aiworkflowlabmd.github.io/portfolio/assets/images/og-cover.jpg">
 
   <script type="application/ld+json">
   {
@@ -708,7 +710,7 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
 
 .video-card {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: 64px 1fr;
   gap: var(--sp-5);
   align-items: center;
   padding: var(--sp-4);
@@ -726,7 +728,7 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
 
 .video-card__thumb {
   position: relative;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 9 / 16;
   border-radius: var(--r-sm);
   overflow: hidden;
   background: var(--color-bg-elevated);
@@ -809,6 +811,11 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
 }
 
 /* Portrait Shorts row: scrolls sideways inside itself when it overflows */
+.work__shorts.has-more {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+
 .work__shorts {
   display: grid;
   grid-auto-flow: column;
@@ -955,15 +962,13 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
 
 .contact__link svg { flex-shrink: 0; }
 
-/* YouTube and Instagram in Contact use brand amber — matching AI Lab button style */
-.contact__link--yt,
-.contact__link--ig {
+/* Email is the primary contact action — brand amber, matching AI Lab buttons */
+.contact__link--primary {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: #0A0A0B;
 }
-.contact__link--yt:hover,
-.contact__link--ig:hover {
+.contact__link--primary:hover {
   background: #b8844a;
   border-color: #b8844a;
   color: #0A0A0B;
@@ -1047,8 +1052,10 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
     top: var(--nav-h);
     left: 0;
     right: 0;
-    /* Extend to bottom of viewport so page content never shows through */
-    bottom: 0;
+    /* Explicit height, not bottom:0 — .nav's backdrop-filter makes it the
+       containing block, so bottom:0 would collapse the panel to nothing */
+    height: calc(100vh - var(--nav-h));
+    height: calc(100dvh - var(--nav-h));
     padding: var(--sp-8) var(--sp-6);
     background: rgba(9, 9, 10, 0.99);
     backdrop-filter: blur(20px);
@@ -1094,7 +1101,8 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
 
   .work__item { padding-block: var(--sp-10); }
   .work__shorts { grid-auto-columns: 42%; }
-  .video-card { grid-template-columns: 112px 1fr; }
+  .video-card { grid-template-columns: 56px 1fr; }
+  .hero__actions .btn { width: 100%; justify-content: center; }
 }
 
 /* ============================================================
@@ -1494,7 +1502,7 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
     <div class="container">
       <div class="section__header space-content">
         <span class="section__label">Contact</span>
-        <h2 class="section__title" id="contact-heading">Let's build<br>better infrastructure.</h2>
+        <h2 class="section__title" id="contact-heading">Let's build <br>better infrastructure.</h2>
         <p class="section__subtitle space-content">Open to architecture, BIM leadership, and digital delivery opportunities.</p>
       </div>
       <div class="contact__links space-content" id="contactLinks" aria-label="Contact links">
@@ -1641,15 +1649,17 @@ function initSectionObserver() {
     for (const sec of sections) {
       if (sec.getBoundingClientRect().top <= mid) active = sec;
     }
-    if (active === last) return;
-    last = active;
+    const inSite = sections[0].getBoundingClientRect().top <= mid;
+    const key = inSite ? active : null;
+    if (key === last) return;
+    last = key;
 
     if (rays) {
       const level = RAY_LEVELS[active.dataset.atm];
       rays.style.opacity = String(level != null ? level : 0.4);
     }
     navLinks.forEach(a =>
-      a.classList.toggle('is-active', a.getAttribute('href') === '#' + active.id));
+      a.classList.toggle('is-active', inSite && a.getAttribute('href') === '#' + active.id));
   }
 
   function schedule() {
@@ -1835,10 +1845,10 @@ function renderContact() {
   if (!container) return;
 
   const links = [
-    portfolio.social.email    && { href: `mailto:${portfolio.social.email}`, label: 'Email',    icon: iconEmail(),    cls: '' },
+    portfolio.social.email    && { href: `mailto:${portfolio.social.email}`, label: 'Email',    icon: iconEmail(),    cls: 'contact__link--primary' },
     portfolio.social.github   && { href: portfolio.social.github,            label: 'GitHub',    icon: iconGitHub(),   cls: '' },
-    portfolio.social.youtube   && { href: portfolio.social.youtube,           label: 'YouTube',   icon: iconYouTube(),  cls: 'contact__link--yt' },
-    portfolio.social.instagram && { href: portfolio.social.instagram,         label: 'Instagram', icon: iconInstagram(),cls: 'contact__link--ig' },
+    portfolio.social.youtube   && { href: portfolio.social.youtube,           label: 'YouTube',   icon: iconYouTube(),  cls: '' },
+    portfolio.social.instagram && { href: portfolio.social.instagram,         label: 'Instagram', icon: iconInstagram(),cls: '' },
   ].filter(Boolean);
 
   container.innerHTML = links.map(link => `
@@ -1889,6 +1899,12 @@ function __boot() {
   initFooterYear();
   renderSkills();
   renderWork();
+  document.querySelectorAll('.work__shorts').forEach(el => {
+    const sync = () => el.classList.toggle('has-more', el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    sync();
+    el.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync, { passive: true });
+  });
   renderChannel();
   renderBuild();
   renderContact();
