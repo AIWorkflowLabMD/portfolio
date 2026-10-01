@@ -757,6 +757,130 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
 
 .video-card:hover .video-card__title { color: var(--color-text); }
 
+/* ---- SELECTED WORK ---------------------------------------- */
+.work__list { display: flex; flex-direction: column; }
+
+.work__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: var(--sp-12);
+  padding-block: var(--sp-12);
+  border-top: 1px solid var(--color-border);
+}
+
+.work__tag {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: var(--sp-4);
+}
+
+.work__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  margin-bottom: var(--sp-4);
+}
+
+.work__desc {
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  max-width: 46ch;
+  margin-bottom: var(--sp-6);
+}
+
+.work__tools { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.work__tools li {
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: rgba(238, 234, 228, 0.7);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--color-border-hover);
+  border-radius: 999px;
+}
+
+/* Portrait Shorts row: scrolls sideways inside itself when it overflows */
+.work__shorts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(128px, 160px);
+  gap: var(--sp-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: var(--sp-3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hover) transparent;
+}
+
+.short-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  scroll-snap-align: start;
+}
+
+.short-card__thumb {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  transition: border-color var(--t-fast) var(--ease);
+}
+
+/* hqdefault is 4:3 with the portrait frame centred; cover-crop recovers it */
+.short-card__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.short-card:hover .short-card__thumb { border-color: var(--color-accent); }
+.short-card:hover .video-card__play { background: rgba(9, 9, 10, 0.15); }
+
+.short-card__ep {
+  margin-top: var(--sp-1);
+  font-family: var(--font-heading);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.short-card__title {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.short-card:hover .short-card__title { color: var(--color-text); }
+
+/* ---- HOW I BUILD (AI Lab) --------------------------------- */
+.build { margin-top: var(--sp-24); }
+
+.build__label {
+  font-family: var(--font-heading);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: var(--sp-6);
+}
+
+.build__text {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
 /* ---- CONTACT ---------------------------------------------- */
 .contact {
   text-align: center;
@@ -940,6 +1064,8 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
 
   .about__grid { grid-template-columns: 1fr; gap: var(--sp-12); }
   .channel__grid { grid-template-columns: 1fr; gap: var(--sp-12); }
+  .work__item { grid-template-columns: 1fr; gap: var(--sp-8); }
+  .build { margin-top: var(--sp-16); }
 }
 
 /* ---- Mobile (≤ 600px) ------------------------------------- */
@@ -965,6 +1091,10 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
   .contact__link { justify-content: center; }
 
   .channel__description:first-of-type { font-size: var(--text-md); }
+
+  .work__item { padding-block: var(--sp-10); }
+  .work__shorts { grid-auto-columns: 42%; }
+  .video-card { grid-template-columns: 112px 1fr; }
 }
 
 /* ============================================================
@@ -1249,6 +1379,7 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
       <ul class="nav__links" role="list">
         <li><a href="#about">About</a></li>
         <li><a href="#skills">Expertise</a></li>
+        <li><a href="#work">Work</a></li>
         <li><a href="#channel">AI Lab</a></li>
         <li><a href="#contact">Contact</a></li>
       </ul>
@@ -1308,6 +1439,20 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
     </div>
   </section>
 
+  <!-- SELECTED WORK — personal projects only. Nothing here comes from employer projects. -->
+  <section class="section work" id="work" aria-labelledby="work-heading" data-atm="gallery">
+    <div class="container">
+      <div class="section__header space-content">
+        <span class="section__label">Selected Work</span>
+        <h2 class="section__title" id="work-heading">Personal projects.<br>Built end to end.</h2>
+        <p class="section__subtitle">Self-initiated work: researched, designed, coded and published in my own time.</p>
+      </div>
+      <div class="work__list" id="workList" aria-label="Personal projects">
+        <!-- Populated by renderWork() -->
+      </div>
+    </div>
+  </section>
+
   <!-- AI LAB — Above the urban grid. The view from elevation. -->
   <section class="section channel" id="channel" aria-labelledby="channel-heading" data-atm="aerial">
     <div class="container">
@@ -1330,8 +1475,15 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
             </a>
           </div>
         </div>
-        <div class="channel__videos space-content" id="channelVideos" aria-label="Recent videos">
+        <div class="channel__videos space-content" id="channelVideos" aria-label="Also on the channel">
           <!-- Populated by renderChannel() -->
+        </div>
+      </div>
+
+      <div class="build space-content">
+        <h3 class="build__label">How I build</h3>
+        <div class="skills__grid build__grid" id="buildGrid" aria-label="Pipelines I built">
+          <!-- Populated by renderBuild() -->
         </div>
       </div>
     </div>
@@ -1385,10 +1537,10 @@ const portfolio = {
     ],
     "Leadership": [
       "Multidisciplinary Coordination",
-      "Client-Facing Delivery",
-      "Cross-Office BIM Management",
+      "Stakeholder Communication",
+      "BIM Team Leadership",
       "Design Review Management",
-      "Regional Programme Leadership",
+      "Programme Coordination",
     ],
     "AI & Automation": [
       "Claude Code",
@@ -1402,26 +1554,64 @@ const portfolio = {
 
   channel: {
     url: "https://www.youtube.com/@AIWorkflowLabMD",
+    /* YouTube Shorts IDs; thumbnails come from i.ytimg.com */
     videos: [
-      /* Add videos as they are published:
-      {
-        title:     "Video title here",
-        thumbnail: "https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg",
-        url:       "https://youtube.com/shorts/VIDEO_ID",
-      },
-      */
+      { id: "38mcg3k9FPU", title: "What is MCP? Model Context Protocol in 30 seconds" },
+      { id: "BUo_G5MfTjk", title: "AI won't replace architects, but this shift will" },
     ],
   },
 
+  /* Personal projects only. Never employer projects, models, drawings or data. */
+  work: [
+    {
+      tag:   "Series · 5 episodes",
+      title: "Station Design Education Series",
+      desc:  "Metro station design explained simply, one idea per episode. Every frame is drawn in code by Claude Opus 5.5 from my briefs and storyboards, guided by Jelly, my own mascot.",
+      tools: ["Canvas 2D", "three.js", "Playwright", "FFmpeg", "Procedural sound"],
+      videos: [
+        { id: "ben8FiKa4Kc", ep: "SD-001", title: "How a metro station works" },
+        { id: "S8iw7baQLVI", ep: "SD-002", title: "3 types of metro station" },
+        { id: "799mIWPKZvo", ep: "SD-003", title: "3 types of metro platform" },
+        { id: "aQFFMZbs-tM", ep: "SD-004", title: "Elevated station platforms" },
+        { id: "CXAmfwQ6o6M", ep: "SD-005", title: "Interchange stations" },
+      ],
+    },
+    {
+      tag:   "Series · 3 episodes",
+      title: "LOD Reference Series",
+      desc:  "What a BIM element looks like at each Level of Development, from LOD 100 to 400. Built from the BIMForum LOD Specification with hand-coded diagrams.",
+      tools: ["BIMForum LOD Spec", "HyperFrames", "SVG", "Python"],
+      videos: [
+        { id: "LNtuK7NtRpY", ep: "LOD 300", title: "Interior swinging doors" },
+        { id: "IvFw28nRsDo", ep: "LOD 400", title: "Structural column, concrete" },
+        { id: "LthXpvBwmm4", ep: "LOD 400", title: "HVAC air distribution (AHU)" },
+      ],
+    },
+    {
+      tag:   "Experiment",
+      title: "AI Station Concept",
+      desc:  "A futuristic metro station that exists only as AI output: prompts written with Claude Sonnet, stills from an image model, motion stitched with MuAPI. The intro of this site uses the same workflow.",
+      tools: ["Claude Sonnet", "GPT Image", "MuAPI", "HyperFrames"],
+      videos: [
+        { id: "zhQwOjJ1K24", ep: "Walkthrough", title: "What AI can do for your design" },
+      ],
+    },
+  ],
+
+  /* Pipelines shown in the AI Lab "How I build" strip */
+  build: [
+    { title: "Code-drawn video",  text: "Single-file HTML scenes rendered frame by frame with Playwright and piped into FFmpeg. Canvas 2D or three.js, one engine per story." },
+    { title: "Auto-publishing",   text: "n8n workflows upload to YouTube and Instagram Reels through their APIs, then pull analytics back into a tracker." },
+    { title: "Procedural sound",  text: "Music beds and sound effects synthesised in Python, synced to the animation timeline. No samples, no licences." },
+    { title: "Scroll-scrub web",  text: "This site: AI-generated frames streamed to a canvas with an adaptive-quality loader and a capped frame cache." },
+  ],
+
   social: {
-    email:    "",
-    linkedin: "",
+    email:    "michaeldaimeimedia@gmail.com",
     github:   "https://github.com/AIWorkflowLabMD",
     youtube:  "https://www.youtube.com/@AIWorkflowLabMD",
     instagram: "https://www.instagram.com/aiworkflowlabmd/",
   },
-
-  resume: "assets/resume/Daimei-M-Resume.pdf",
 };
 
 
@@ -1568,9 +1758,9 @@ function renderChannel() {
   }
 
   const html = portfolio.channel.videos.slice(0, 3).map(video => `
-    <a class="video-card" href="${video.url}" target="_blank" rel="noopener" aria-label="Watch: ${video.title}">
+    <a class="video-card" href="${shortUrl(video.id)}" target="_blank" rel="noopener" aria-label="Watch on YouTube: ${video.title}">
       <div class="video-card__thumb">
-        <img src="${video.thumbnail}" alt="${video.title}" loading="lazy" />
+        <img src="${shortThumb(video.id)}" alt="" loading="lazy" />
         <div class="video-card__play" aria-hidden="true">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M8 5v14l11-7z"/>
@@ -1584,6 +1774,59 @@ function renderChannel() {
   container.innerHTML = html;
 }
 
+const shortUrl   = id => `https://www.youtube.com/shorts/${id}`;
+const shortThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+
+/* ============================================================
+   RENDER: SELECTED WORK
+============================================================ */
+function renderWork() {
+  const list = document.getElementById('workList');
+  if (!list) return;
+
+  list.innerHTML = portfolio.work.map(item => `
+    <article class="work__item space-content">
+      <div class="work__info">
+        <span class="work__tag">${item.tag}</span>
+        <h3 class="work__title">${item.title}</h3>
+        <p class="work__desc">${item.desc}</p>
+        <ul class="work__tools" role="list" aria-label="Tools">
+          ${item.tools.map(t => `<li>${t}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="work__shorts">
+        ${item.videos.map(v => `
+          <a class="short-card" href="${shortUrl(v.id)}" target="_blank" rel="noopener" aria-label="Watch on YouTube: ${v.ep}, ${v.title}">
+            <div class="short-card__thumb">
+              <img src="${shortThumb(v.id)}" alt="" loading="lazy" />
+              <div class="video-card__play" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+            </div>
+            <span class="short-card__ep">${v.ep}</span>
+            <span class="short-card__title">${v.title}</span>
+          </a>
+        `).join('')}
+      </div>
+    </article>
+  `).join('');
+}
+
+/* ============================================================
+   RENDER: HOW I BUILD
+============================================================ */
+function renderBuild() {
+  const grid = document.getElementById('buildGrid');
+  if (!grid) return;
+
+  grid.innerHTML = portfolio.build.map(b => `
+    <div class="skills__category">
+      <h4 class="skills__category-title">${b.title}</h4>
+      <p class="build__text">${b.text}</p>
+    </div>
+  `).join('');
+}
+
 /* ============================================================
    RENDER: CONTACT LINKS
 ============================================================ */
@@ -1593,7 +1836,6 @@ function renderContact() {
 
   const links = [
     portfolio.social.email    && { href: `mailto:${portfolio.social.email}`, label: 'Email',    icon: iconEmail(),    cls: '' },
-    portfolio.social.linkedin && { href: portfolio.social.linkedin,          label: 'LinkedIn',  icon: iconLinkedIn(), cls: '' },
     portfolio.social.github   && { href: portfolio.social.github,            label: 'GitHub',    icon: iconGitHub(),   cls: '' },
     portfolio.social.youtube   && { href: portfolio.social.youtube,           label: 'YouTube',   icon: iconYouTube(),  cls: 'contact__link--yt' },
     portfolio.social.instagram && { href: portfolio.social.instagram,         label: 'Instagram', icon: iconInstagram(),cls: 'contact__link--ig' },
@@ -1614,9 +1856,6 @@ function renderContact() {
 /* ---- SVG Icons -------------------------------------------- */
 function iconEmail() {
   return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
-}
-function iconLinkedIn() {
-  return `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>`;
 }
 function iconGitHub() {
   return `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>`;
@@ -1649,7 +1888,9 @@ function __boot() {
   /* Static content */
   initFooterYear();
   renderSkills();
+  renderWork();
   renderChannel();
+  renderBuild();
   renderContact();
 
   /* Navigation + smooth scroll */
