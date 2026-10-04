@@ -880,6 +880,7 @@ button { cursor: pointer; background: none; border: none; font: inherit; }
   background: #000;
 }
 .feature-video video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.feature-video img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 .feature-video__play {
   position: absolute;
@@ -1638,6 +1639,19 @@ const portfolio = {
   /* Personal projects only. Never employer projects, models, drawings or data. */
   work: [
     {
+      tag:   "Interactive · live in the browser",
+      title: "Station Airflow Explainer",
+      desc:  "How an underground station breathes: piston air, a stalled train, a train fire with smoke control, and evacuation. One HTML file, built with Claude from my design direction. Orbit, zoom and click through the scenarios yourself.",
+      tools: ["three.js", "Claude Code", "Playwright", "FFmpeg"],
+      videos: [],
+      feature: {
+        href:   "station-airflow/",
+        poster: "assets/images/station-airflow-thumb.jpg",
+        ep:     "Interactive · opens in a new tab",
+        title:  "Try it live",
+      },
+    },
+    {
       tag:   "Series · 5 episodes",
       title: "Station Design Education Series",
       desc:  "Metro station design explained simply, one idea per episode. Every frame is drawn in code by Claude Opus 5.5 from my briefs and storyboards, guided by Jelly, my own mascot.",
@@ -1893,7 +1907,7 @@ function renderWork() {
   `).join('');
 
   /* Click-to-play: nothing but the poster loads until the visitor asks */
-  list.querySelectorAll('.feature-video').forEach(box => {
+  list.querySelectorAll('.feature-video:not(.feature-video--link)').forEach(box => {
     const video = box.querySelector('video');
     box.querySelector('.feature-video__play').addEventListener('click', () => {
       video.preload = 'auto';
@@ -1905,6 +1919,19 @@ function renderWork() {
 }
 
 function renderFeature(f) {
+  if (f.href) return `
+    <div class="work__feature">
+      <a class="feature-video feature-video--link" href="${f.href}" target="_blank" rel="noopener" aria-label="${f.title} (opens in a new tab)">
+        <img src="${f.poster}" alt="" loading="lazy" />
+        <span class="feature-video__play" aria-hidden="true">
+          <span class="feature-video__icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>
+          </span>
+        </span>
+      </a>
+      <span class="short-card__ep">${f.ep}</span>
+      <span class="short-card__title">${f.title} ↗</span>
+    </div>`;
   return `
     <div class="work__feature">
       <div class="feature-video">
