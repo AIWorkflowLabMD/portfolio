@@ -1,0 +1,1847 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How does an underground station breathe? · Interactive</title>
+<meta name="description" content="Interactive cutaway of a generic metro station: piston air, a stalled train, a train fire with smoke control, and evacuation. One HTML file, three.js. Illustrative values, not CFD.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aiworkflowlabmd.github.io/portfolio/station-airflow/">
+<meta property="og:title" content="How does an underground station breathe?">
+<meta property="og:description" content="Interactive station airflow explainer: orbit, zoom, click. Generic station, illustrative values, not CFD.">
+<meta property="og:image" content="https://aiworkflowlabmd.github.io/portfolio/station-airflow/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#e9e6de; --sheet:#f5f3ee; --ink:#1c2228; --ink2:#59616a; --rule:#c9c4b8;
+  --red:#c8371d; --blue:#2463a8; --hot:#c8371d;
+  --pw:340px; --gap:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:'Barlow',system-ui,sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;display:block}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* drawing frame with grid references */
+#frame{position:fixed;left:var(--gap);top:var(--gap);bottom:var(--gap);right:calc(var(--pw) + var(--gap) * 2);border:1.5px solid var(--ink);pointer-events:none}
+#frame::after{content:'';position:absolute;inset:18px;border:.75px solid var(--ink)}
+.refs{position:absolute;display:flex;justify-content:space-around;font:600 10px 'JetBrains Mono',monospace;color:var(--ink2)}
+.refs.h{left:18px;right:18px;height:18px;align-items:center}
+.refs.v{top:18px;bottom:18px;width:18px;flex-direction:column;align-items:center}
+.refs.t{top:0}.refs.b{bottom:0}.refs.l{left:0}.refs.r{right:0}
+#north{position:absolute;left:34px;top:30px;font:600 10px 'JetBrains Mono',monospace;color:var(--ink2);letter-spacing:.08em}
+#north b{display:block;font:700 22px 'Barlow Condensed',sans-serif;color:var(--ink);letter-spacing:.02em}
+#scalebar{position:absolute;left:30px;bottom:28px;font:500 10px 'JetBrains Mono',monospace;color:var(--ink2);letter-spacing:.08em;background:var(--sheet);padding:3px 6px;border:.75px solid var(--ink)}
+
+/* sheet panel */
+#sheet{position:fixed;top:var(--gap);right:var(--gap);bottom:var(--gap);width:var(--pw);background:var(--sheet);border:1.5px solid var(--ink);display:flex;flex-direction:column;overflow:hidden}
+#sheet .scroll{flex:1;overflow:auto}
+.sec{border-bottom:.75px solid var(--ink);padding:10px 14px 12px}
+body.inc #pVent .sec{padding:7px 14px 9px}   /* incident: room for the assumption line without losing the readings */
+.sh{display:flex;align-items:baseline;gap:8px;font:600 10px 'JetBrains Mono',monospace;letter-spacing:.1em;color:var(--ink2);margin-bottom:8px}
+.sh b{color:var(--ink);font-weight:600}
+.sh .k{margin-left:auto;font-weight:400}
+#head .ref{font:600 10px 'JetBrains Mono',monospace;letter-spacing:.12em;color:var(--red)}
+#head h1{margin:4px 0 4px;font:700 30px/0.95 'Barlow Condensed',sans-serif;letter-spacing:.01em;text-transform:uppercase}
+#head p{margin:0;font-size:13.5px;line-height:1.4;color:var(--ink2)}
+.seg{display:flex;border:1px solid var(--ink)}
+.seg button{flex:1;border:none;border-right:1px solid var(--ink)}
+.seg button:last-child{border-right:none}
+.row{display:flex;gap:6px}
+.row button{flex:1}
+button{font:600 13px 'Barlow',sans-serif;color:var(--ink);background:transparent;border:1px solid var(--ink);border-radius:0;padding:7px 8px;cursor:pointer;letter-spacing:.01em}
+button:hover{background:rgba(28,34,40,.06)}
+button.on{background:var(--ink);color:var(--sheet)}
+button.warn.on{background:var(--red);border-color:var(--red);color:#fff}
+button.go.on{background:var(--blue);border-color:var(--blue);color:#fff}
+button:disabled{opacity:.3;cursor:not-allowed}
+table.sched{width:100%;border-collapse:collapse;font-size:13px}
+.sched td{border-top:.75px solid var(--rule);padding:5px 0}
+.sched tr:first-child td{border-top:none}
+.sched td.v{text-align:right;font:600 14px 'JetBrains Mono',monospace}
+.sched td.u{width:42px;padding-left:6px;font:400 11px 'JetBrains Mono',monospace;color:var(--ink2)}
+.tag{display:inline-block;font:600 8.5px 'JetBrains Mono',monospace;letter-spacing:.08em;padding:1px 4px;border:1px solid currentColor;white-space:nowrap;vertical-align:1px}
+.tag.code{color:#fff;background:var(--blue);border-color:var(--blue)}
+.tag.prac{color:var(--ink)}
+.tag.illus{color:var(--ink2);border-style:dashed}
+.tag.inf{color:var(--red)}
+.tag.open{color:var(--ink2);background:#dcd8cf;border-color:#dcd8cf}
+.mname{font:700 22px/1 'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.02em}
+.mname.hot{color:var(--red)}
+.mrule{font-size:12.5px;line-height:1.4;color:var(--ink2);margin:4px 0 8px}
+.sched td.f{text-align:right;font:600 12px 'JetBrains Mono',monospace;white-space:nowrap}
+.dmp{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.dmp span{font:600 10px 'JetBrains Mono',monospace;padding:2px 6px;border:1px solid;letter-spacing:.04em}
+.dmp .o{color:#1f7a45;border-color:#1f7a45}
+.dmp .c{color:#fff;background:var(--red);border-color:var(--red)}
+.dmp .m{color:var(--ink2);border-style:dashed}
+.tabs{display:flex;border-bottom:1.5px solid var(--ink)}
+.tabs button{flex:1;border:none;border-right:.75px solid var(--ink);font:600 11px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;padding:8px}
+.tabs button:last-child{border-right:none}
+.fans{display:grid;grid-template-columns:repeat(3,1fr);border:.75px solid var(--ink)}
+.fans div{padding:4px 6px;border-right:.75px solid var(--ink)}
+.fans div:last-child{border-right:none}
+.fans .l{display:block;font:400 9px 'JetBrains Mono',monospace;letter-spacing:.08em;color:var(--ink2)}
+.fans b{font:600 11.5px 'JetBrains Mono',monospace;white-space:nowrap}
+.fans b.sup{color:var(--blue)} .fans b.ext{color:var(--red)}
+#legend{position:absolute;right:30px;bottom:28px;background:var(--sheet);border:.75px solid var(--ink);padding:4px 8px;font:500 9.5px 'JetBrains Mono',monospace;color:var(--ink2);letter-spacing:.06em}
+#legend .row{display:flex;align-items:center;gap:8px}
+#legend .key{margin-top:4px;padding-top:4px;border-top:.75px solid var(--rule);line-height:1.5}
+#legend .key b{color:var(--ink);font-weight:600}
+#legend .amb{width:12px;height:7px;background:#8fb8c6}
+#legend .ramp{width:120px;height:7px;background:linear-gradient(90deg,#1f5fbf,#2f9a48 21%,#d9a400 43%,#e2611b 71%,#c0221a)}
+#legend .sm{width:12px;height:7px;background:#4a4e53;opacity:.75}
+#evc{position:absolute;left:34px;top:84px;background:var(--sheet);border:.75px solid var(--ink);padding:5px 9px 6px;font:500 10px 'JetBrains Mono',monospace;color:var(--ink2);letter-spacing:.06em;display:none;min-width:260px}
+#evc b{display:block;color:var(--red);font-weight:600;margin-bottom:3px}
+#evc .r{display:flex;align-items:center;gap:7px;margin-top:3px}
+#evc .r span{width:112px}
+#evc .r i{flex:1;height:6px;background:#dcd8cf;position:relative;min-width:50px}
+#evc .r u{position:absolute;left:0;top:0;bottom:0;background:var(--blue);text-decoration:none}
+#evc .r u.late{background:var(--red)}
+#evc .r em{font-style:normal;font-weight:600;color:var(--ink);width:78px;text-align:right}
+.ekey{display:flex;flex-wrap:wrap;gap:4px 10px;font:500 10.5px 'JetBrains Mono',monospace;color:var(--ink2);margin-top:8px}
+.ekey i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.ecount{font:500 10.5px 'JetBrains Mono',monospace;color:var(--ink2);margin-top:6px;line-height:1.5}
+.sched.calc td{font-size:12px}
+.sched.calc td.v{font-size:12px;white-space:nowrap}
+.fine{font-size:11px;color:var(--ink2);margin-top:6px;line-height:1.4}
+table.chk{width:100%;border-collapse:collapse;font-size:12px}
+.chk td{border-top:.75px solid var(--rule);padding:5px 0;vertical-align:top}
+.chk tr:first-child td{border-top:none}
+.chk small{display:block;font:400 10px 'JetBrains Mono',monospace;color:var(--ink2);margin-top:1px}
+.chk td.v{text-align:right;font:600 12px 'JetBrains Mono',monospace;white-space:nowrap;padding-left:6px}
+.chk td.t{text-align:right;width:62px;padding-left:6px}
+.sub{display:flex;gap:6px;margin-top:6px;align-items:center;font:600 10px 'JetBrains Mono',monospace;color:var(--ink2);letter-spacing:.06em}
+.sub button{flex:1;font-size:12px;padding:4px}
+#cap{font-size:13.5px;line-height:1.45;min-height:78px}
+#cap b{font-family:'JetBrains Mono',monospace;font-weight:600}
+#cap .sev{color:var(--red);font-weight:600}
+.asm{margin-top:5px;font-size:11px;line-height:1.3;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* title block */
+#tb{border-top:1.5px solid var(--ink);display:grid;grid-template-columns:1fr 1fr;font-size:11px}
+#tb div{padding:5px 10px;border-right:.75px solid var(--ink);border-bottom:.75px solid var(--ink)}
+#tb div:nth-child(2n){border-right:none}
+#tb .l{display:block;font:400 9px 'JetBrains Mono',monospace;letter-spacing:.1em;color:var(--ink2)}
+#tb .w{grid-column:1 / -1;border-right:none}
+#tb .st{color:var(--red);font-weight:600}
+#tb .by{font:600 13px 'Barlow Condensed',sans-serif;letter-spacing:.04em;text-transform:uppercase}
+#tb .btns{grid-column:1 / -1;border:none;display:flex;gap:6px;padding:8px 10px}
+#tb .btns button{flex:1;font-size:12px;padding:5px}
+
+/* callouts with leaders */
+#leaders{position:fixed;inset:0;pointer-events:none;width:100%;height:100%}
+#leaders polyline{fill:none;stroke:var(--ink);stroke-width:1}
+#leaders circle{fill:var(--ink)}
+#leaders .hot polyline{stroke:var(--red)} #leaders .hot circle{fill:var(--red)}
+#labels{position:fixed;inset:0;pointer-events:none}
+.lab{position:absolute;font:600 11px 'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding:1px 4px 1px 2px;color:var(--ink);background:rgba(245,243,238,.9);display:flex;align-items:center;gap:5px}
+.lab i{font:600 9px 'JetBrains Mono',monospace;font-style:normal;width:15px;height:15px;border:1px solid currentColor;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--sheet)}
+.lab.hot{color:var(--red)}
+
+/* notes overlay */
+#how{position:fixed;inset:0;margin:auto;width:min(620px,calc(100vw - 32px));max-height:82vh;overflow:auto;background:var(--sheet);border:1.5px solid var(--ink);padding:18px 22px 20px;display:none;z-index:5;box-shadow:8px 8px 0 rgba(28,34,40,.18)}
+#how h2{margin:0 0 4px;font:700 24px 'Barlow Condensed',sans-serif;text-transform:uppercase}
+#how .ref{font:600 10px 'JetBrains Mono',monospace;letter-spacing:.12em;color:var(--red)}
+#how ol{margin:12px 0 0;padding-left:22px}
+#how li{margin:0 0 10px;font-size:14px;line-height:1.5}
+#how li b{display:block;font:600 11px 'JetBrains Mono',monospace;letter-spacing:.1em}
+#how .x{position:absolute;top:12px;right:12px;padding:3px 9px}
+
+/* guided tour: full-bleed model, burned-in caption; the same view is recorded for the videos */
+#tour{position:fixed;inset:0;pointer-events:none;display:none;z-index:4}
+body.tour #tour{display:block}
+body.tour #sheet,body.tour #leaders,body.tour #labels,body.tour .refs,body.tour #north,body.tour #scalebar,body.tour #legend{display:none}
+body.tour #frame{border:none;right:var(--gap)}
+body.tour #frame::after{display:none}
+#tCap{position:absolute;left:50%;bottom:8%;transform:translateX(-50%);width:min(88%,1150px);text-align:center;font:600 clamp(19px,2.2vw + 1.2vh,44px)/1.22 'Barlow',sans-serif;color:var(--sheet);background:rgba(28,34,40,.82);padding:.5em .85em;border-left:4px solid var(--red)}
+#tCap.end{bottom:auto;top:50%;transform:translate(-50%,-50%);border-left:none;border-top:4px solid var(--red);padding:.8em 1em}
+#tCap small{display:block;margin-top:.45em;font:500 .5em 'JetBrains Mono',monospace;letter-spacing:.08em;color:#c9c4b8;text-transform:uppercase}
+#tNote{position:absolute;left:clamp(14px,2vw,34px);top:clamp(14px,2vh,30px);font:600 clamp(10px,.7vw + .5vh,15px) 'JetBrains Mono',monospace;letter-spacing:.1em;color:var(--ink);background:rgba(245,243,238,.9);border:.75px solid var(--ink);padding:4px 8px}
+#tNote b{color:var(--red);font-weight:600}
+#tBar{position:absolute;left:0;top:0;height:3px;background:var(--red);width:0}
+#tExit{position:absolute;right:clamp(14px,2vw,30px);top:clamp(14px,2vh,26px);pointer-events:auto;background:var(--sheet)}
+body.cap #tBar,body.cap #tExit{display:none}
+body.tour:not(.tegr) #evc{display:none!important}
+body.tour #evc{transform:scale(1.6);transform-origin:0 0;top:clamp(48px,6vh,80px)}
+
+@media (max-width:760px){
+  :root{--pw:auto}
+  #frame,#north,#scalebar,#leaders,#labels,#legend{display:none}
+  #sheet{left:var(--gap);right:var(--gap);top:auto;width:auto;height:46vh}
+  #head h1{font-size:24px}
+  #tb div:not(.btns){display:none}
+}
+@media (max-height:500px) and (min-width:761px){   /* phone held sideways: keep the controls reachable */
+  :root{--pw:300px;--gap:8px}
+  #north,#scalebar,#legend,#leaders,#labels{display:none}
+  #head p,#tb div:not(.btns){display:none}
+  #head h1{font-size:20px}
+}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<svg id="leaders"></svg>
+<div id="labels"></div>
+
+<div id="frame">
+  <div class="refs h t"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span></div>
+  <div class="refs h b"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span></div>
+  <div class="refs v l"><span>1</span><span>2</span><span>3</span><span>4</span></div>
+  <div class="refs v r"><span>1</span><span>2</span><span>3</span><span>4</span></div>
+  <div id="north"><b>SECTION A–A</b>LONGITUDINAL CUTAWAY · LOOKING NORTH</div>
+  <div id="evc"><b id="evH">EVACUATION · ALARM</b>
+    <div class="r"><span>Platform clear</span><i><u id="evPb"></u></i><em id="evP">–</em></div>
+    <div class="r"><span>Out of concourse</span><i><u id="evSb"></u></i><em id="evS">–</em></div>
+  </div>
+  <div id="scalebar">PERSPECTIVE VIEW · NOT TO SCALE · FLOW ILLUSTRATIVE, NOT CFD OUTPUT<br>TUNNEL PUFFS MOVE AT AIR SPEED READOUT ×8</div>
+  <div id="legend"><div class="row">HEAT · LOW 18 °C<span class="ramp"></span>46 °C+ HIGH</div><div class="row" style="margin-top:3px"><span class="amb"></span>OUTSIDE AIR<span class="sm"></span>SMOKE</div><div class="key"><b>IN TUNNELS</b> piston air · fan air<br><b>OVER TRACK</b> trackway heat → exhaust<br><b>STATION AC</b> supply → room → return grilles → AHU<br>(own loop, apart from the tunnel air)</div></div>
+</div>
+
+<div id="sheet">
+  <div class="scroll">
+    <div class="sec" id="head">
+      <div class="ref">ST-VE-001 · VENTILATION</div>
+      <h1>Underground<br>Metro Station</h1>
+      <p>Trains, people and machines all turn into heat. Follow the air that carries it out.</p>
+    </div>
+    <div class="tabs"><button id="tVent" class="on">Ventilation</button><button id="tEgr">Egress</button></div>
+    <div id="pVent">
+    <div class="sec">
+      <div class="sh"><b>01</b>OPERATION<span class="k">1 · 2 · 3</span></div>
+      <div class="seg" id="loadRow">
+        <button data-load="0">Night</button><button data-load="1">Off-peak</button><button data-load="2">Peak</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sh"><b>02</b>LAYERS<span class="k">F · T · L</span></div>
+      <div class="row"><button id="bAir">Airflow</button><button id="bHeat">Heat</button><button id="bLab">Callouts</button></div>
+    </div>
+    <div class="sec">
+      <div class="sh"><b>03</b>INCIDENT<span class="k">O · X · G</span></div>
+      <div class="row"><button id="bStall" class="warn">Stall a train</button><button id="bFire" class="warn">Fire on train</button></div>
+      <div class="sub" id="fireRow">FIRE AT<button id="bRear">Rear end</button><button id="bFront">Front end</button></div>
+      <div class="sub">CONTROL<button id="bTvs" class="go">TVS auto</button></div>
+      <div class="asm" id="incAsm"><span title="The usual first response is to drive the train on to a station; the fans take over only when it cannot move.">Assumes the train can't be moved to a station</span> <span class="tag prac">PRACTICE</span></div>
+    </div>
+    <div class="sec">
+      <div class="sh"><b>04</b>TVS MODE<span class="k" id="mTag"></span></div>
+      <div class="mname" id="mName">–</div>
+      <div class="mrule" id="mRule"></div>
+      <div class="fans"><div><span class="l">WEST END</span><b id="fW">–</b></div><div><span class="l">ADJACENT</span><b id="fA">–</b></div><div><span class="l">EAST END</span><b id="fE">–</b></div></div>
+    </div>
+    <div class="sec">
+      <div class="sh"><b>05</b>READINGS<span class="k"><span class="tag illus">ILLUSTRATIVE</span></span></div>
+      <table class="sched">
+        <tr><td>Station heat load</td><td class="v" id="sHeat">–</td><td class="u">MW</td></tr>
+        <tr><td>Tunnel air speed</td><td class="v" id="sAir">–</td><td class="u">m/s</td></tr>
+        <tr><td>Incident clock (×6)</td><td class="v" id="sClk">–</td><td class="u">m:s</td></tr>
+      </table>
+    </div>
+    <div class="sec" style="border-bottom:none">
+      <div class="sh"><b>06</b>NOTE</div>
+      <div id="cap"></div>
+    </div>
+    </div>
+    <div id="pEgr" style="display:none">
+      <div class="sec" style="border-bottom:none">
+        <div class="sh"><b>E1</b>EVACUATION<span class="k"><span class="tag illus">ILLUSTRATIVE</span></span></div>
+        <div class="mname" id="eName">Start a train fire</div>
+        <div class="mrule">When the fire alarm sounds, the station is evacuated. People walk to the stairs and escalators, queue, climb to the concourse and leave through the fare gates, which open on alarm.</div>
+        <table class="sched">
+          <tr><td>Platform clear · limit 4:00</td><td class="v" id="eP">–</td></tr>
+          <tr><td>Out of concourse · limit 6:00</td><td class="v" id="eS">–</td></tr>
+        </table>
+        <div class="ekey"><span><i style="background:#d62a1e"></i>on platform · not yet clear</span><span><i style="background:#e0a526"></i>stairs · escalators</span><span><i style="background:#1f9e89"></i>concourse</span></div>
+        <div class="ecount" id="eCnt"></div>
+      </div>
+      <div class="sec" style="border-bottom:none">
+        <div class="sh"><b>E2</b>HAND CALC · NFPA 130 (2017)<span class="k"><span class="tag code">CODE</span></span></div>
+        <table class="sched calc" id="eCalc"></table>
+        <div class="mrule" style="margin-top:8px">The figures follow this hand calculation. It is an illustration, not a validated crowd simulation. Inputs are generic. Lifts are not counted. Fare gates release open on the fire alarm (5.3.8.2) but still count at 50 p/min each, so people queue there when the inflow is higher. The concourse is taken as the point of safety, which 5.3.3.3 allows only for a protected concourse (assumed here); the street climb is shown as a check. In this generic layout each platform end is a dead end of about 34 m to the nearest stair bank, over the 25 m common-path limit (5.3.3.5); a real design adds an exit there <span class="tag code">CODE</span>.</div>
+      </div>
+    </div>
+  </div>
+  <div id="tb">
+    <div><span class="l">DRAWING</span>ST-VE-001</div>
+    <div><span class="l">REVISION</span>D1 · DRAFT</div>
+    <div><span class="l">SCALE</span>NTS</div>
+    <div><span class="l">DATE</span>2026-10</div>
+    <div class="w"><span class="l">STATUS</span><span class="st">ILLUSTRATIVE · NOT DESIGN VALUES</span></div>
+    <div class="w"><span class="l">BUILT BY</span><span class="by">Michael Daimei · with Claude · three.js</span></div>
+    <div class="btns"><button id="bTour" class="go" title="Guided tour (P)">▶ Tour</button><button id="bCam" title="Orbit camera (C)">Orbit</button><button id="bHow">General notes</button></div>
+  </div>
+</div>
+
+<div id="tour"><div id="tBar"></div><div id="tNote">GENERIC STATION · <b>ILLUSTRATIVE</b> · NOT CFD</div><button id="tExit">Exit tour ✕</button><div id="tCap"></div></div>
+
+<div id="how">
+  <button class="x" id="howX">×</button>
+  <div class="ref">ST-VE-001 · GENERAL NOTES</div>
+  <h2>Where the heat goes</h2>
+  <ol>
+    <li><b>THE BOX</b>An underground station is a box buried in soil with very little natural ventilation. Almost every watt used inside it ends up as heat in the air, so the station's ventilation is really a machine for carrying that heat back up to the street.</li>
+    <li><b>HEAT SOURCES</b>At peak, the biggest source is the trains: braking and traction losses, and the condensers of their air-conditioning. Passengers, lighting, escalators and equipment rooms add the rest. At night, with no trains, the station still runs lights, fans and pumps.</li>
+    <li><b>PISTON EFFECT</b>A train in a tunnel works like a piston. It pushes a slug of air ahead of it and drags air in behind it. That free air movement helps ventilate the tunnels while trains are running.</li>
+    <li><b>TRACKWAY EXHAUST</b>Ducts over the track (over-track exhaust, OTE) pull hot air from the brakes and AC condensers before it reaches the platform, and push it up the vent shafts. Platform screen doors keep the tunnel air apart from the platform air.</li>
+    <li><b>STATION COOLING</b>Air-handling units in the plant rooms supply cooled air to the concourse and platform.</li>
+    <li><b>TVS PLANT</b>Each station end has a fan room with two reversible tunnel ventilation fans (TVFs). The air path is: tunnel → nozzle damper (NZD) or tunnel damper (SRD) → fans → fan isolation damper (FID) → vent shaft → shaft damper (SD) → street. A draught relief damper (DRD) links the tunnel straight to the shaft and bypasses the fans. In supply, a Saccardo nozzle jets air along the tunnel to raise its velocity. The adjacent station has the same plant. Here it is drawn close and simplified; in reality it is typically around a kilometre away. <span class="tag prac">PRACTICE</span></li>
+    <li><b>NORMAL MODE</b>The TVFs are off. DRD and SD stay open, so the piston effect breathes tunnel air in and out through the shafts (normal-open). When the outside air is hot, SD can close so the air recirculates instead (normal-closed, not shown). <span class="tag prac">PRACTICE</span></li>
+    <li><b>CONGESTION MODE</b>If a train stops in the tunnel, the piston effect stops with it, while the train's AC keeps rejecting heat. As the air at the AC condensers nears about 46 °C, the TVS starts push-pull: the station nearer the train supplies and the farther one extracts. <span class="tag prac">PRACTICE</span></li>
+    <li><b>EMERGENCY MODE</b>For a train fire, the airflow direction is set by where the fire is, so that smoke goes away from the side passengers evacuate to. The airflow must reach at least the critical velocity, which stops smoke creeping back under the crown (backlayering), and full mode must be reached within 180 s (NFPA 130 2017 §7.2.1). Critical velocity depends on the design fire size, which is a project value, so no number is shown. <span class="tag code">CODE</span></li>
+    <li><b>CODE BASIS</b>NFPA 130 (2017) Chapter 7 sets the emergency ventilation requirements: airflow held for at least 1 h, and fans rated for the hot-gas temperature found by analysis, not less than 150 °C. NBC 2016 has no trainway ventilation section, so Indian practice followed NFPA 130 and specified fans at 250 °C for 2 h. NBC 2026 Annex J-6 adds a trainway emergency ventilation section, including a 2 h airflow duration. <span class="tag code">CODE</span></li>
+    <li><b>CODE &amp; PRACTICE CHECK</b><table class="chk" id="chk"></table></li>
+    <li><b>THE FLOW</b>Soft puffs of air drift along the air paths at the air speed. Their colour and density show how concentrated the heat is: dense red where the heat is concentrated (brakes, AC condensers, a stalled train), thinning through orange and yellow to green and blue where it has mixed out or been cooled. Fire smoke rises to the tunnel crown and spreads along it as a layer; against the airflow it creeps back (backlayering) until the fans reach critical velocity. This is an illustration of the behaviour, not CFD output. <span class="tag illus">ILLUSTRATIVE</span></li>
+    <li><b>EVIDENCE LABELS</b>
+      <span class="tag code">CODE</span> a clause in a published standard ·
+      <span class="tag prac">PRACTICE</span> documented metro operating practice ·
+      <span class="tag inf">INFERRED</span> engineering inference, still to be confirmed ·
+      <span class="tag open">OPEN</span> project-specific, deliberately not stated ·
+      <span class="tag illus">ILLUSTRATIVE</span> numbers chosen so the trends read.</li>
+    <li><b>THE NUMBERS</b>Every temperature, speed and timing on this sheet is illustrative, and the incident clock runs at 6× speed. None of them is a design value. Real projects size tunnel ventilation with network simulation (SES-type models) and CFD against project criteria. Maintenance mode (damper tests and air purge at night) is not shown.</li>
+    <li><b>KEYS</b>1 2 3 operation · F airflow · T heat · L callouts · O stall a train · X train fire · R swap fire end · G TVS auto · C orbit camera · P guided tour · H these notes</li>
+  </ol>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+const $ = id => document.getElementById(id);
+const QS = new URLSearchParams(location.search);
+if (QS.has('seed')) { let r = (+QS.get('seed') || 1) >>> 0; Math.random = () => (r = (r * 1664525 + 1013904223) >>> 0) / 4294967296; }
+const HQ = new URLSearchParams(location.search).get('q') !== 'low' && !(matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820);
+
+// ---------- renderer / scene ----------
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.localClippingEnabled = true;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+const PAPER = 0xe9e6de;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(PAPER, 560, 1200);
+// backdrop: sky gradient with soft clouds over the top of the view, fading to the drawing paper below the model
+function makeBackdrop(w, h, visH) {
+  const k = Math.min(1, 1600 / Math.max(w, h)), W = Math.round(w * k), H = Math.round(h * k), V = visH * k;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, V);
+  gr.addColorStop(0, '#8db3d3'); gr.addColorStop(0.28, '#b9d2e4'); gr.addColorStop(0.5, '#e2ebef'); gr.addColorStop(0.66, '#f1efe9'); gr.addColorStop(1, '#f1efe9');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const U = Math.min(W, V * 1.6) / 100;                                   // cloud scale unit
+  for (let c = 0; c < 7; c++) {
+    const cx = (0.04 + 0.92 * rnd()) * W, cy = (0.05 + 0.24 * rnd()) * V, sz = (1.8 + 1.95 * rnd()) * U, n = 4 + Math.floor(rnd() * 3);
+    g.fillStyle = 'rgba(214, 226, 236, 0.9)';                              // soft shaded base
+    for (let i = 0; i < n; i++) { g.beginPath(); g.ellipse(cx + (i - n / 2) * sz * 0.9, cy + sz * 0.25, sz * (0.9 + rnd() * 0.5), sz * 0.55, 0, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = 'rgba(255, 255, 255, 0.95)';                             // lit tops
+    for (let i = 0; i < n; i++) { g.beginPath(); g.arc(cx + (i - n / 2) * sz * 0.9 + sz * 0.1, cy - sz * 0.05 * (1 + (i % 2)), sz * (0.55 + rnd() * 0.45), 0, Math.PI * 2); g.fill(); }
+  }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  if (scene.background && scene.background.isTexture) scene.background.dispose();
+  scene.background = t;
+}
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+const camera = new THREE.PerspectiveCamera(36, innerWidth / innerHeight, 1, 3000);
+camera.position.set(-175, 78, 128);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(-55, 5, 0);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 50; controls.maxDistance = 750;
+scene.add(new THREE.HemisphereLight(0xf2efe8, 0x5a4c40, 0.5));
+const sun = new THREE.DirectionalLight(0xfff4e4, 2.2);
+sun.position.set(-140, 260, 190); sun.target.position.set(0, 0, -10); scene.add(sun, sun.target);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -280, right: 280, top: 140, bottom: -140, near: 50, far: 700 });
+sun.shadow.bias = -0.0012; sun.shadow.normalBias = 1.2;
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+// ambient occlusion: contact shadow in corners, under the train and round the people (desktop tier)
+const gtao = HQ ? new GTAOPass(scene, camera, innerWidth, innerHeight) : null;
+if (gtao) { gtao.updateGtaoMaterial({ radius: 2.5, distanceExponent: 1.3, thickness: 2.5, scale: 1.3, samples: 16 }); gtao.blendIntensity = 0.9; composer.addPass(gtao); }
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.3, 0.45, 0.94);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// the sheet panel covers the right side (bottom on phones): shift the view so the model centres in the free area
+function fitView() {
+  const w = innerWidth, h = innerHeight, side = w > 760;
+  const tour = document.body.classList.contains('tour'), P = tour || !side ? 0 : 352, Q = tour || side ? 0 : Math.round(h * 0.46);
+  camera.aspect = (w + P) / (h + Q);
+  // portrait: wider lens and pull back so the station box stays in frame
+  const portrait = camera.aspect < 1;
+  camera.fov = tour ? tourFov(camera.aspect) : portrait ? 60 : 36;
+  const off = camera.position.clone().sub(controls.target);
+  off.setLength(portrait ? 380 : Math.min(off.length(), 380));
+  camera.position.copy(controls.target).add(off);
+  if (P || Q) camera.setViewOffset(w + P, h + Q, P, Q, w, h); else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h); composer.setSize(w, h);
+  makeBackdrop(w, h, h - Q);
+  if (typeof puffU !== 'undefined') puffU.uPx.value = renderer.getDrawingBufferSize(new THREE.Vector2()).y / 2;
+}
+
+// ---------- materials / helpers ----------
+const TUN_X = 245;                       // tunnel portal limit (scene clip)
+const clipX = [new THREE.Plane(new THREE.Vector3(1, 0, 0), TUN_X), new THREE.Plane(new THREE.Vector3(-1, 0, 0), TUN_X)];
+const std = (color, roughness = 0.85, metalness = 0, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
+// section poché: faces that look along the cut (±z) get drafting hatch lines in world space
+function hatched(mat, key, { spacing = 1.2, amt = 0.5, cross = false, ink = 0x1c2228 } = {}) {
+  mat.customProgramCacheKey = () => 'hatch-' + key;
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, { uInk: { value: new THREE.Color(ink) }, uSp: { value: spacing }, uAmt: { value: amt } });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vHP; varying vec3 vHN;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvHP = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvHN = normalize(mat3(modelMatrix) * objectNormal);');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vHP; varying vec3 vHN; uniform vec3 uInk; uniform float uSp; uniform float uAmt;
+float hline(float d) { float g = abs(fract(d - 0.5) - 0.5) / max(fwidth(d), 1e-4); return 1.0 - clamp(g - 0.35, 0.0, 1.0); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+if (abs(vHN.z) > 0.9) {
+  float h = hline((vHP.x + vHP.y) * 0.7071 / uSp);
+  ${cross ? 'h = max(h, hline((vHP.x - vHP.y) * 0.7071 / uSp));' : ''}
+  diffuseColor.rgb = mix(diffuseColor.rgb, uInk, h * uAmt);
+}`);
+  };
+  return mat;
+}
+const M = {
+  concrete: hatched(std(0xa3a19c, 0.9), 'conc', { spacing: 0.9, amt: 0.26 }),
+  slab: hatched(std(0xbab7b1, 0.85), 'slab', { spacing: 0.9, amt: 0.22 }),
+  ghost: std(0xc9cdd0, 0.6, 0, { transparent: true, opacity: 0.14, depthWrite: false }),
+  ghostDuct: std(0xd8dde2, 0.4, 0.3, { transparent: true, opacity: 0.2, depthWrite: false }),
+  finish: new THREE.MeshPhysicalMaterial({ color: 0x9c9a95, roughness: 0.35, clearcoat: 0.5, clearcoatRoughness: 0.3 }),   // polished stone floor
+  soil: hatched(std(0xa58e72, 1), 'soil', { spacing: 1.8, amt: 0.42, cross: true, ink: 0x3a2e22 }),
+  topsoil: hatched(std(0x7f6a54, 1), 'top', { spacing: 0.7, amt: 0.35, ink: 0x2c231a }),
+  plinth: hatched(std(0x8f7f6b, 1), 'rock', { spacing: 2.6, amt: 0.3, ink: 0x2a2119 }),
+  asphalt: std(0x55585c, 0.95), pave: std(0xc8bfaf, 0.9), mark: std(0xf2efe8, 0.9), grass: std(0x7a8c5e, 1),
+  building: std(0xe4e0d7, 0.8), bglass: std(0x7f929e, 0.25, 0.4),
+  trackbed: std(0x6a6d70, 0.9), rail: std(0xc5ccd2, 0.3, 0.9),
+  steel: new THREE.MeshPhysicalMaterial({ color: 0xb4bbc1, roughness: 0.3, metalness: 0.85, clearcoat: 0.25 }), darksteel: std(0x4a5158, 0.5, 0.6),
+  glass: new THREE.MeshPhysicalMaterial({ color: 0xcfeaf2, roughness: 0.05, transparent: true, opacity: 0.24, depthWrite: false, clearcoat: 1 }),
+  ahu: std(0xe8e4da, 0.6), tree: std(0x6f8a58, 1), trunk: std(0x5a4330, 1),
+  light: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff6e0).multiplyScalar(2.4), toneMapped: false }),   // glows through bloom
+  tread: std(0xc9b79a, 0.8), ink: std(0x1c2228, 0.6),
+};
+// ink outlines on structure: reads as a technical illustration, not a render
+const INK = new THREE.LineBasicMaterial({ color: 0x1c2228, transparent: true, opacity: 0.4 });
+const EDGED = new Set([M.concrete, M.slab, M.soil, M.topsoil, M.building, M.ahu, M.pave, M.plinth]);
+function box(x0, x1, y0, y1, z0, z1, mat, { cast = true, recv = true, parent = scene } = {}) {
+  if (x1 < x0) [x0, x1] = [x1, x0];
+  if (y1 < y0) [y0, y1] = [y1, y0];
+  if (z1 < z0) [z0, z1] = [z1, z0];
+  const r = Math.min(0.12, 0.25 * Math.min(x1 - x0, y1 - y0, z1 - z0));
+  const m = new THREE.Mesh(r > 0.01 ? new RoundedBoxGeometry(x1 - x0, y1 - y0, z1 - z0, 2, r) : new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat);
+  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  m.castShadow = cast; m.receiveShadow = recv; parent.add(m);
+  if (EDGED.has(mat)) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0)), INK));   // outline the box, not the bevel facets
+  return m;
+}
+
+// ---------- geometry (metres; x along track, y up, z across) ----------
+// Cutaway: everything in front of z = 0 inside the station box is removed so the inside reads.
+const Y = { base: 0, plat: 1.1, conc: 7, concTop: 8, roof: 19, ground: 20, tun: 3, tunR: 3.2 };
+const TRACK_Z = [-8, 8];
+
+// soil diorama (sectioned)
+box(-252, 252, -14, -2, -62, 14, M.plinth);
+// soil stops at the back face of the diaphragm wall (z = -15.2): a shared face plane z-fights (flicker)
+box(-252, 252, -2, 15, -62, -15.2, M.soil);
+box(-252, 252, 15, 19.6, -62, -15.2, M.topsoil);
+for (const s of [-1, 1]) {
+  box(s * 91.2, s * 252, -2, 15, -15.2, -11.4, M.soil);
+  box(s * 91.2, s * 252, 15, 19.6, -15.2, -11.4, M.topsoil);
+  box(s * 90, s * 252, -2, 0.6, -11.4, 14, M.soil);          // bed under tunnels
+}
+// street level behind the cut
+box(-252, 252, 19.6, 20, -62, -14, M.pave);
+box(-252, 252, 20, 20.05, -40, -26, M.asphalt);
+for (let x = -240; x <= 240; x += 12) box(x - 1.5, x + 1.5, 20.05, 20.08, -33.3, -32.7, M.mark, { cast: false });
+// grass verges: along the tree line (gaps at the entrances and shaft heads) and in front of the buildings
+{
+  const skip = [[36, 52], [80, 95], [224, 240]], xs = [-252];
+  for (const [a, b] of skip) xs.push(-b, -a, a, b);
+  xs.push(252); xs.sort((a, b) => a - b);
+  for (let i = 0; i < xs.length; i += 2) box(xs[i], xs[i + 1], 20, 20.04, -24.5, -18.5, M.grass, { cast: false });
+  box(-252, 252, 20, 20.04, -45.5, -41, M.grass, { cast: false });
+}
+for (let x = -230; x <= 230; x += 22) {
+  if (Math.abs(Math.abs(x) - 87) < 10 || Math.abs(Math.abs(x) - 232) < 10 || Math.abs(Math.abs(x) - 44) < 11) continue;
+  box(x - 0.3, x + 0.3, 20, 23, -21.3, -20.7, M.trunk);
+  const c = new THREE.Mesh(new THREE.IcosahedronGeometry(2.6, 0), M.tree);
+  c.position.set(x, 25, -21); c.castShadow = true; scene.add(c);
+}
+[[-220, -170, 9], [-160, -120, 14], [-110, -40, 7], [-30, 10, 12], [20, 70, 8], [80, 140, 16], [150, 215, 10]].forEach(([x0, x1, h]) => {
+  box(x0, x1, 20, 20 + h, -60, -46, M.building);
+  for (let y = 22.5; y < 20 + h - 1.5; y += 3.5) box(x0 + 1, x1 - 1, y, y + 1.6, -46.1, -45.9, M.bglass, { cast: false });
+});
+// station entrances at street level
+for (const s of [-1, 1]) {
+  box(s * 38, s * 50, 20, 23.5, -22, -15.2, M.slab);
+  box(s * 39, s * 49, 20.2, 23, -15.25, -15.1, M.bglass, { cast: false });
+}
+
+// station box: base slab, back diaphragm wall, roof (back strip), concourse slab
+box(-90, 90, -2, 0, -14, 14, M.concrete);
+box(-90, 90, -2, 19.6, -15.2, -14, M.concrete);              // top under the paving (shared top face flickers)
+box(-90, 90, Y.roof, Y.ground, -14, -10, M.concrete);
+for (const s of [-1, 1]) box(s * 90, s * 91.2, -2, Y.ground, -15.2, -11.4, M.concrete);
+// plan layout: lifts pair at the centre, an escalator / stair / escalator bank each side, fare gates at |x| = GATE_X,
+// paid concourse in the middle, unpaid ends under the street entrances
+const GATE_X = 34, ESC_X = [16, 30], LIFT_X = 4.2;
+const GATE_CZ = [-11.6, -10.76, -9.92, -9.08, -8.24, -7.4];                // fare gate console centres (z)
+const OPENINGS = [];                                                       // [x0, x1, z0, z1] behind the cut
+for (const s of [-1, 1]) OPENINGS.push([s * 14, s * 32, -4, 0], [s * (LIFT_X - 1.5), s * (LIFT_X + 1.5), -1.5, 0]);
+// slab with rectangular holes: x strips between hole edges, z runs between holes; equal strips merge (no false seams)
+function holed(x0, x1, z0, z1, y0, y1, holes, mat, o) {
+  const H = holes.map(([a, b, c, d]) => [Math.min(a, b), Math.max(a, b), Math.min(c, d), Math.max(c, d)]);
+  const xs = [...new Set([x0, x1, ...H.flatMap(h => [h[0], h[1]]).filter(x => x > x0 && x < x1)])].sort((p, q) => p - q);
+  let run = null;
+  const flush = () => { if (run) for (const [za, zb] of run.z) box(run.a, run.b, y0, y1, za, zb, mat, o); };
+  for (let i = 0; i < xs.length - 1; i++) {
+    const xa = xs[i], xb = xs[i + 1], cut = H.filter(h => h[0] < xb - 1e-6 && h[1] > xa + 1e-6).sort((p, q) => p[2] - q[2]);
+    const z = []; let zc = z0;
+    for (const h of cut) { if (h[2] > zc) z.push([zc, Math.min(h[2], z1)]); zc = Math.max(zc, h[3]); }
+    if (zc < z1) z.push([zc, z1]);
+    const key = JSON.stringify(z);
+    if (run && run.key === key) run.b = xb; else { flush(); run = { a: xa, b: xb, z, key }; }
+  }
+  flush();
+}
+{ // concourse slab: solid behind the cut (stair / escalator, lift, TVS duct and shaft openings), ghosted in front
+  const plant = [];
+  for (const s of [-1, 1]) plant.push([s * 62.4, s * 68, -10, -6], [s * 84, s * 90, -13, -1]);   // NZD / SRD drop (inside the fan room), shaft well
+  holed(-90, 90, -14, 0, Y.conc, Y.concTop, [...OPENINGS, ...plant], M.slab);
+  box(-90, 90, Y.conc, Y.concTop, 0, 14, M.ghost, { cast: false, recv: false });
+  holed(-60, 60, -14, 0, Y.concTop, Y.concTop + 0.04, OPENINGS, M.finish, { cast: false });
+}
+// platform + finishes + columns
+box(-70, 70, 0, Y.plat, -5, 5, M.concrete);
+box(-70, 70, Y.plat, Y.plat + 0.05, -4.9, 4.9, M.finish, { cast: false });
+for (const x of [-64, -42, 0, 42, 64]) {                       // clear of the escalator banks
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, Y.conc - Y.plat, 16), M.slab);
+  c.position.set(x, (Y.plat + Y.conc) / 2, -2.2); c.castShadow = c.receiveShadow = true; scene.add(c);
+}
+for (let x = -66; x <= 66; x += 12) if (Math.abs(Math.abs(x) - 23) > 12) box(x - 3, x + 3, Y.conc - 0.12, Y.conc - 0.02, -3.8, -3.4, M.light, { cast: false });
+// platform screen doors: glass bays, posts, transom
+for (const z of [-5, 5]) {
+  box(-70, 70, Y.plat, 3.3, z - 0.04, z + 0.04, M.glass, { cast: false, recv: false });
+  box(-70, 70, 3.3, 3.8, z - 0.15, z + 0.15, M.darksteel);
+  for (let x = -70; x <= 70; x += 5) box(x - 0.08, x + 0.08, Y.plat, 3.3, z - 0.1, z + 0.1, M.darksteel, { cast: false });
+}
+const PSD_HI = new THREE.MeshBasicMaterial({ color: 0x2a9d8f, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+const psdHi = [];
+for (const z of [-5, 5]) psdHi.push(box(-70, 70, Y.plat, 3.8, z - 0.2, z + 0.2, PSD_HI, { cast: false, recv: false }));
+// track bed + rails (station and tunnels)
+for (const z of TRACK_Z) {
+  box(-TUN_X, TUN_X, -0.2, 0.05, z - 1.8, z + 1.8, M.trackbed, { cast: false });
+  for (const dz of [-0.75, 0.75]) box(-TUN_X, TUN_X, 0.05, 0.22, z + dz - 0.04, z + dz + 0.04, M.rail, { cast: false });
+}
+// over-track exhaust ducts with hangers
+for (const z of TRACK_Z) {                         // the near duct is in front of the cut: ghosted so the platform reads
+  const front = z > 0;
+  box(-58, 58, 5.6, 6.6, z - 1.5, z + 1.5, front ? M.ghostDuct : M.steel, front ? { cast: false, recv: false } : {});
+  for (let x = -54; x <= 54; x += 12) box(x - 0.05, x + 0.05, 6.6, Y.conc, z - 0.05, z + 0.05, front ? M.ghostDuct : M.darksteel, { cast: false });
+}
+// AHU plant rooms on the concourse (behind the cut)
+for (const s of [-1, 1]) {
+  box(s * 61, s * 50, Y.concTop, 13.5, -14, -12.8, M.slab);
+  box(s * 60, s * 51, Y.concTop, 11.5, -12, -6.5, M.ahu);
+  for (let k = 0; k < 3; k++) box(s * (58.5 - k * 2.6) - 0.8, s * (58.5 - k * 2.6) + 0.8, 11.5, 12.6, -11, -7.2, M.steel);
+}
+// station AC return: high-level grilles collect room air back to the AHUs, a closed loop apart from the tunnel ventilation
+const RET_C = [12, 24, 42], RET_P = [10, 40, 54];
+for (const s of [-1, 1]) {
+  box(s * 8, s * 51.5, 13.0, 13.8, -13.95, -13.05, M.steel);                         // concourse return duct on the back wall
+  box(s * 49.5, s * 51.5, 12.8, 13.8, -13.05, -9.5, M.steel);                         // stub into the AHU
+  for (const x of RET_C) box(s * x - 1.2, s * x + 1.2, 12.94, 13.0, -13.85, -13.15, M.ink, { cast: false });
+  box(s * 8, s * 61, 6.2, 6.8, -4.65, -4.05, M.steel);                               // platform return duct under the ceiling
+  box(s * 60.2, s * 61, 6.2, 12.8, -4.65, -4.05, M.steel);                           // riser through the concourse slab
+  box(s * 58, s * 61, 12.0, 12.8, -9, -4.05, M.steel);                               // across into the AHU
+  for (const x of RET_P) box(s * x - 1.2, s * x + 1.2, 6.14, 6.2, -4.55, -4.15, M.ink, { cast: false });
+}
+// fare gate line at |x| = GATE_X: paid concourse in the middle (vertical circulation), unpaid ends under the entrances
+for (const s of [-1, 1]) {
+  for (const z of GATE_CZ) {                                                // consoles: 5 gates, 0.6 m clear (min 455 mm, NFPA 130 5.3.8.4)
+    box(s * GATE_X - 0.6, s * GATE_X + 0.6, Y.concTop, Y.concTop + 1.0, z - 0.12, z + 0.12, M.steel);
+    box(s * GATE_X - 0.5, s * GATE_X + 0.5, Y.concTop + 0.6, Y.concTop + 1.3, z + 0.14, z + 0.18, M.glass, { cast: false, recv: false });
+  }
+  box(s * GATE_X - 0.3, s * GATE_X + 0.3, Y.concTop, Y.concTop + 1.1, -6.12, -5.88, M.steel);              // swing gate post
+  box(Math.min(s * GATE_X, s * (GATE_X + 1.1)), Math.max(s * GATE_X, s * (GATE_X + 1.1)), Y.concTop + 0.1, Y.concTop + 1.0, -6.2, -6.16, M.glass, { cast: false, recv: false });   // leaf, released open
+  for (const [za, zb] of [[-14, -11.72], [-5.88, 0]]) box(s * GATE_X - 0.04, s * GATE_X + 0.04, Y.concTop, Y.concTop + 1.1, za, zb, M.glass, { cast: false, recv: false });
+  // balustrades round the stair / escalator opening (open towards the cut)
+  box(s * 14, s * 32, Y.concTop, Y.concTop + 1.1, -4.04, -3.96, M.glass, { cast: false, recv: false });
+  for (const x of [14, 32]) box(s * x - 0.04, s * x + 0.04, Y.concTop, Y.concTop + 1.1, -3.96, 0, M.glass, { cast: false, recv: false });
+}
+// paid / unpaid floor zones (tinted overlays on the finish)
+const ZONE = {
+  paid: new THREE.MeshBasicMaterial({ color: 0x4f8fd0, transparent: true, opacity: 0.5, depthWrite: false }),
+  unpaid: new THREE.MeshBasicMaterial({ color: 0xd8a24a, transparent: true, opacity: 0.45, depthWrite: false }),
+};
+holed(-GATE_X, GATE_X, -14, 0, Y.concTop + 0.05, Y.concTop + 0.07, OPENINGS, ZONE.paid, { cast: false });
+for (const s of [-1, 1]) {
+  box(s * GATE_X, s * 50, Y.concTop + 0.05, Y.concTop + 0.07, -14, 0, ZONE.unpaid, { cast: false });
+  box(s * 50, s * 60, Y.concTop + 0.05, Y.concTop + 0.07, -6.5, 0, ZONE.unpaid, { cast: false });
+}
+// each bank: up escalator (back) · fixed stair (middle) · down escalator (front); tops land towards the centre
+const ESC = [], ESC_Z = 2.7;
+for (const s of [-1, 1]) for (const z of [-ESC_Z, ESC_Z]) {
+  const x0 = s * ESC_X[1], x1 = s * ESC_X[0], dx = x1 - x0, dy = Y.conc - Y.plat + 0.9;
+  const len = Math.hypot(dx, dy);
+  const g = new THREE.Group();
+  box(-len / 2, len / 2, -0.35, 0.35, -0.8, 0.8, M.darksteel, { parent: g });
+  for (const dz of [-0.85, 0.85]) box(-len / 2, len / 2, 0.35, 1.25, dz - 0.04, dz + 0.04, M.glass, { parent: g, cast: false, recv: false });
+  for (const dz of [-0.85, 0.85]) box(-len / 2, len / 2, 1.25, 1.32, dz - 0.06, dz + 0.06, M.ink, { parent: g, cast: false });   // black handrails
+  g.position.set((x0 + x1) / 2, (Y.plat + Y.concTop) / 2, z);
+  g.rotation.z = Math.atan2(dy, dx);
+  scene.add(g);
+  const N = Math.floor(len / 0.4), steps = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.06, 1.4), M.steel, N);
+  steps.position.y = 0.38; steps.instanceMatrix.setUsage(THREE.DynamicDrawUsage); g.add(steps);
+  // local +x runs from the platform end up to the concourse end: up unit (back) moves +, down unit (front) moves -
+  ESC.push({ steps, len, N, dir: z < 0 ? 1 : -1, ph: Math.random() });
+}
+ESC[2].oos = true;   // evacuation: east up escalator taken as out of service (NFPA 130 2017 5.3.5.6); down units stop and are walked up
+// fixed stair between the escalators: 2 flights of 23 risers (150 mm) on a 300 mm going, 1.8 m mid landing;
+// warm stone treads with dark nosings and solid stringers so it reads apart from the steel escalators
+{
+  const RISE = (Y.concTop - Y.plat) / 46, W = 1.2;
+  const rail = (ax, ay, bx, by, z, mat = M.darksteel, t = 0.07) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(bx - ax, by - ay), t, t), mat);
+    m.position.set((ax + bx) / 2, (ay + by) / 2, z); m.rotation.z = Math.atan2(by - ay, bx - ax); m.castShadow = true; scene.add(m);
+  };
+  for (const s of [-1, 1]) {
+    let x = s * 14.3, y = Y.concTop;                                       // build down from the concourse edge, outwards
+    for (let f = 0; f < 2; f++) {
+      const xa = x, ya = y;
+      for (let k = 0; k < 22; k++) {
+        y -= RISE;
+        box(x, x + s * 0.3, y - 0.18, y, -W, W, M.tread);
+        box(x, x + s * 0.05, y - 0.03, y + 0.01, -W, W, M.ink, { cast: false });   // nosing
+        x += s * 0.3;
+      }
+      y -= RISE;
+      for (const z of [-W - 0.1, W + 0.1]) {
+        rail(xa, ya - 0.3, x, y + RISE - 0.3, z, M.slab, 0.45);          // stringer
+        rail(xa, ya + 0.9, x, y + RISE + 0.9, z);                         // handrail
+      }
+      if (f === 0) { box(x, x + s * 1.8, y - 0.25, y, -W - 0.15, W + 0.15, M.tread); x += s * 1.8; }
+    }
+  }
+}
+// lifts platform <-> concourse: the pair at the centre of the station, inside the paid area; glass shaft, moving car
+const LIFTS = [];
+for (const s of [-1, 1]) {
+  const cx = s * LIFT_X, h = 1.35, top = Y.concTop + 3.2;
+  box(cx - h, cx + h, Y.plat, top - 0.02, -h, h, M.glass, { cast: false, recv: false });
+  for (const dx of [-h, h]) for (const dz of [-h, h]) box(cx + dx - 0.07, cx + dx + 0.07, Y.plat, top, dz - 0.07, dz + 0.07, M.darksteel, { cast: false });
+  box(cx - h - 0.1, cx + h + 0.1, top, top + 0.35, -h - 0.1, h + 0.1, M.darksteel);
+  const car = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.4, 2.2), std(0xd6d0c2, 0.5, 0.2)); car.castShadow = true; scene.add(car);
+  car.position.set(cx, Y.plat + 1.25, 0);
+  LIFTS.push({ car, cx, ph: s > 0 ? 0.5 : 0 });
+}
+const ss = t => t * t * (3 - 2 * t);
+function updateVertical(dt) {
+  for (const E of ESC) {                                                   // 0.5 m/s step speed
+    const run = !EV.started ? 1 : E.oos || E.dir < 0 ? 0 : 1;
+    E.ph = (E.ph + run * E.dir * 0.5 * dt / E.len + 1) % 1;
+    for (let i = 0; i < E.N; i++) { _m.makeTranslation(-E.len / 2 + ((i / E.N + E.ph) % 1) * E.len, 0, 0); E.steps.setMatrixAt(i, _m); }
+    E.steps.instanceMatrix.needsUpdate = true;
+  }
+  for (const L of LIFTS) {                                                 // dwell, travel ~1.2 m/s, dwell, travel
+    L.ph = (L.ph + dt / 28) % 1; const f = L.ph;
+    const k = f < 0.3 ? 0 : f < 0.5 ? ss((f - 0.3) / 0.2) : f < 0.8 ? 1 : 1 - ss((f - 0.8) / 0.2);
+    L.car.position.y = Y.plat + 1.25 + k * (Y.concTop - Y.plat);
+  }
+}
+// tunnels: half-cut lining (back + invert kept), open where the camera looks in
+const tunnelGlow = [];
+const LINING = std(0x8f8d89, 0.9, 0, { side: THREE.DoubleSide });
+function lining(a, b, z, t0, tl) {
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(Y.tunR, Y.tunR, b - a, 40, 1, true, t0, tl), LINING);
+  cyl.rotation.z = Math.PI / 2; cyl.position.set((a + b) / 2, Y.tun, z); cyl.receiveShadow = true; cyl.castShadow = true; scene.add(cyl);
+}
+function tunnel(x0, x1, z, openings = []) {        // openings: shaft x positions where the crown connects to the shaft
+  const len = x1 - x0, cx = (x0 + x1) / 2;
+  let a = x0;
+  for (const ox of openings.sort((p, q) => p - q)) {
+    lining(a, ox - 3.8, z, Math.PI / 2, Math.PI * 1.5);
+    lining(ox - 3.8, ox + 3.8, z, Math.PI, Math.PI);   // invert only: open to the shaft above
+    a = ox + 3.8;
+  }
+  lining(a, x1, z, Math.PI / 2, Math.PI * 1.5);
+  for (let x = x0 + 6; x < x1; x += 12) {           // ring joints
+    if (openings.some(ox => Math.abs(x - ox) < 4.5)) continue;
+    const rg = new THREE.TorusGeometry(Y.tunR - 0.02, 0.06, 4, 40, Math.PI * 1.5); rg.rotateZ(Math.PI); rg.rotateY(Math.PI / 2);
+    const r = new THREE.Mesh(rg, M.darksteel); r.position.set(x, Y.tun, z); scene.add(r);
+  }
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(Y.tunR - 0.15, Y.tunR - 0.15, len, 40, 1, true, Math.PI / 2, Math.PI * 1.5),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
+  glow.rotation.z = Math.PI / 2; glow.position.set(cx, Y.tun, z); glow.visible = false; scene.add(glow);
+  return glow;
+}
+const glowAW = tunnel(-TUN_X, -90, -8, [-232]), glowBW = tunnel(-TUN_X, -90, 8), glowAE = tunnel(90, TUN_X, -8, [232]), glowBE = tunnel(90, TUN_X, 8);
+tunnelGlow.push(glowAW, glowBW, glowAE, glowBE);
+
+// ---------- TVS plant (DataBank E01/E04/E08/E11: 2 reversible TVFs per station end, nozzle, damper chain) ----------
+const CASING = std(0xa9b0b6, 0.4, 0.6, { transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
+// axial fan built along local y; rotor spins about y
+function axialFan(x, y, z, { r = 1.7, len = 6.5, alongX = true } = {}) {
+  const g = new THREE.Group(), rotor = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 28, 1, true), CASING));
+  for (const e of [-1, 1]) { const rg = new THREE.Mesh(new THREE.TorusGeometry(r, 0.12, 6, 28), M.darksteel); rg.rotation.x = Math.PI / 2; rg.position.y = e * len / 2; g.add(rg); }
+  rotor.add(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.3, r * 0.3, len * 0.55, 16), M.darksteel));
+  for (let i = 0; i < 8; i++) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(r * 0.68, 0.1, r * 0.42), M.steel);
+    b.position.x = r * 0.62; b.rotation.x = 0.5; const piv = new THREE.Group(); piv.rotation.y = i / 8 * Math.PI * 2; piv.add(b); rotor.add(piv);
+  }
+  g.add(rotor);
+  if (alongX) g.rotation.z = Math.PI / 2;
+  g.position.set(x, y, z); scene.add(g);
+  return rotor;
+}
+// damper blade: colour shows its state (open / closed / moving)
+const DMP_MAT = { o: std(0x2f8f55, 0.5), c: std(0xc8371d, 0.5), m: std(0x9aa0a6, 0.5) };
+function damper(x0, x1, y0, y1, z0, z1) { const m = box(x0, x1, y0, y1, z0, z1, DMP_MAT.o, { cast: false }); return m; }
+const PLANT = {};
+// station end s (-1 west, +1 east): shaft well at |x| 84-90 over the trackway, fan room at |x| 62-84 on the concourse level
+function stationEnd(s) {
+  const P = { fans: [], d: {} };
+  // shaft well walls (front cut) + headhouse on the roof
+  box(s * 83.4, s * 84, 14, Y.ground, -13, -1, M.concrete);
+  // fan room side of the shaft: wall from the slab up, framing the FID opening (y 8.6-13.4, z -12.6 to -5.4)
+  box(s * 83.4, s * 84, Y.conc, 8.6, -13, -1, M.concrete);
+  box(s * 83.4, s * 84, 13.4, 14, -13, -1, M.concrete);
+  box(s * 83.4, s * 84, 8.6, 13.4, -13, -12.6, M.concrete);
+  box(s * 83.4, s * 84, 8.6, 13.4, -5.4, -1, M.concrete);
+  box(s * 90, s * 90.6, Y.conc, Y.ground, -13, -1, M.concrete);
+  box(s * 81.5, s * 92.5, Y.ground, Y.ground + 4.5, -13.8, -7, M.slab);
+  for (let y = Y.ground + 0.8; y < Y.ground + 4; y += 0.7) box(s * 82, s * 92, y, y + 0.25, -7.05, -6.9, M.darksteel, { cast: false });
+  // fan room: inboard partition, two reversible TVFs in parallel
+  box(s * 62, s * 62.4, Y.concTop, 14, -14, -4, M.concrete);
+  for (const z of [-11.3, -6.7]) P.fans.push(axialFan(s * 73, 10.4, z));
+  for (const z of [-11.3, -6.7]) box(s * 73 - 1.2, s * 73 + 1.2, Y.concTop, 8.7, z - 1.2, z + 1.2, M.darksteel);   // fan plinths
+  // dampers
+  P.d.DRD = damper(s * 84.2, s * 89.8, 7.3, 7.6, -12.8, -1.2);          // tunnel ↔ shaft bypass (draught relief)
+  P.d.SD = damper(s * 84.2, s * 89.8, 19.2, 19.5, -12.8, -1.2);         // shaft top
+  P.d.FID = damper(s * 83.55, s * 83.85, 8.6, 13.4, -12.6, -5.4);      // fan isolation, in the shaft wall opening
+  P.d.NZD = damper(s * 68, s * 64.4, 7.55, 7.8, -10, -6);               // nozzle damper
+  P.d.SRD = damper(s * 64.2, s * 62.5, 7.55, 7.8, -10, -6);               // tunnel damper (straight path)
+  // Saccardo nozzle: angled duct that jets supply air along the tunnel, away from the station
+  const nz = new THREE.Group();
+  box(-3.6, 3.6, -0.5, 0.5, -1.6, 1.6, M.steel, { parent: nz });
+  nz.position.set(s * 69.5, 6.3, -8); nz.rotation.z = -s * 0.24; scene.add(nz);
+  return P;
+}
+PLANT.W = stationEnd(-1); PLANT.E = stationEnd(1);
+// adjacent stations, drawn close and simplified (really ~1 km away): shaft over the tunnel with the fan pair
+function adjacent(x) {
+  for (const s of [-1, 1]) box(x + s * 3.8, x + s * 4.6, Y.tun + Y.tunR + 0.3, Y.ground, -13, -1, M.concrete);
+  box(x - 4.6, x + 4.6, 0, Y.ground, -13.8, -13, M.concrete);
+  box(x - 5.5, x + 5.5, Y.ground, Y.ground + 4.5, -13.8, -7, M.slab);
+  for (let y = Y.ground + 0.8; y < Y.ground + 4; y += 0.7) box(x - 4.8, x + 4.8, y, y + 0.25, -7.05, -6.9, M.darksteel, { cast: false });
+  return { fans: [-10, -4].map(z => axialFan(x, 13, z, { r: 1.7, len: 3, alongX: false })) };
+}
+PLANT.AW = adjacent(-232); PLANT.AE = adjacent(232);
+
+// trains (neutral livery: no operator branding)
+const TRAIN_BODY = new THREE.Color(0x3b4249);
+function makeTrain() {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshPhysicalMaterial({ color: TRAIN_BODY, roughness: 0.32, metalness: 0.55, clearcoat: 0.6, clippingPlanes: clipX });
+  const C = (c, r = 0.4, m = 0.3) => std(c, r, m, { clippingPlanes: clipX });
+  const win = std(0x2a2620, 0.1, 0.2, { emissive: 0xffe2b0, emissiveIntensity: 1.6, clippingPlanes: clipX }), stripe = C(0xd9dee2, 0.3, 0.7), gapM = C(0x1b1f23, 0.9, 0), roofM = C(0xaab2b8, 0.45, 0.6);
+  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
+  add(new THREE.BoxGeometry(130, 3.4, 2.9), mat, 0, 0, 0);
+  for (const z of [-1.47, 1.47]) {
+    add(new THREE.BoxGeometry(127, 0.85, 0.06), win, 0, 0.55, z);
+    add(new THREE.BoxGeometry(130, 0.3, 0.06), stripe, 0, -0.7, z);
+  }
+  for (let i = 1; i < 6; i++) add(new THREE.BoxGeometry(0.6, 3.45, 2.95), gapM, -65 + i * 130 / 6, 0, 0);
+  for (let i = 0; i < 6; i++) add(new THREE.BoxGeometry(6, 0.4, 1.8), roofM, -65 + (i + 0.5) * 130 / 6, 1.9, 0);
+  for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.1, 1.2, 2.4), win, s * 65.02, 0.6, 0);
+  g.userData.mat = mat;
+  g.position.y = 2.0; scene.add(g); return g;
+}
+const trainA = makeTrain(), trainB = makeTrain(), trainStall = makeTrain();
+trainA.position.z = -8; trainB.position.z = 8; trainStall.position.set(-170, 2.0, -8); trainStall.visible = false;
+
+// passengers: count follows the service level; held trains during an incident build up the platform crowd
+const PAX_MAX = 200;
+const SHIRTS = [0x34495e, 0x9e3b2c, 0x2e5f8a, 0xb8932a, 0x7d8a8f, 0x3f6b4a, 0xe8e2d6, 0x5b4470, 0xc4733a, 0x2f7f76].map(c => new THREE.Color(c));
+function crowd(place) {
+  const im = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.26, 1.05, 3, 8), std(0xffffff, 0.8), PAX_MAX);
+  im.castShadow = true;
+  const m = new THREE.Matrix4();
+  im.userData.home = []; im.userData.shirt = [];
+  for (let i = 0; i < PAX_MAX; i++) {
+    const [x, y, z] = place(), c = SHIRTS[Math.floor(Math.random() * SHIRTS.length)];
+    m.makeTranslation(x, y, z); im.setMatrixAt(i, m); im.setColorAt(i, c);
+    im.userData.home.push([x, y, z]); im.userData.shirt.push(c);
+  }
+  scene.add(im); return im;
+}
+const paxPlat = crowd(() => {
+  let x, z;
+  do { x = -64 + Math.random() * 128; z = -4.2 + Math.random() * 8.4; }
+  while ((Math.abs(Math.abs(x) - 23.5) < 10 && Math.abs(z) < 3.8)                  // escalator / stair banks
+    || (Math.abs(Math.abs(x) - LIFT_X) < 2.4 && Math.abs(z) < 2.4)                    // lifts
+    || (Math.abs(z + 2.2) < 0.8 && [-64, -42, 0, 42, 64].some(c => Math.abs(x - c) < 0.8)));   // columns
+  return [x, Y.plat + 0.85, z];
+});
+const paxConc = crowd(() => {
+  let x, z;
+  do { x = -49 + Math.random() * 98; z = -13 + Math.random() * 12.5; }
+  while ((Math.abs(Math.abs(x) - 23) < 10 && z > -5.5) || (Math.abs(Math.abs(x) - LIFT_X) < 2.4 && z > -2.6)
+    || Math.abs(Math.abs(x) - GATE_X) < 0.8 || (Math.abs(x) > 49 && z < -6));        // off the openings, lifts and gate line
+  return [x, Y.concTop + 0.85, z];
+});
+
+// heat floor planes
+function heatPlane(w, d, x, y, z) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.visible = false; scene.add(m); return m;
+}
+const heatPlat = heatPlane(140, 9.8, 0, Y.plat + 0.1, 0);
+const heatConc = heatPlane(176, 14, 0, Y.concTop + 0.1, -7);
+
+// ---------- temperature colour ramp (contrast tuned for the paper ground) ----------
+const STOPS = [[18, 0x1f5fbf], [24, 0x2f9a48], [30, 0xd9a400], [38, 0xe2611b], [46, 0xc0221a]].map(([t, c]) => [t, new THREE.Color(c)]);
+function tempColor(t, out = new THREE.Color()) {
+  if (t <= STOPS[0][0]) return out.copy(STOPS[0][1]);
+  for (let i = 1; i < STOPS.length; i++) if (t <= STOPS[i][0]) {
+    const f = (t - STOPS[i - 1][0]) / (STOPS[i][0] - STOPS[i - 1][0]);
+    return out.copy(STOPS[i - 1][1]).lerp(STOPS[i][1], f);
+  }
+  return out.copy(STOPS.at(-1)[1]);
+}
+
+// ---------- state + illustrative model ----------
+const LOADS = [
+  { name: 'Night', tph: 0, pax: 0, equip: 200 },             // engineering hours: station closed
+  { name: 'Off-peak', tph: 12, pax: 600, equip: 350 },
+  { name: 'Peak', tph: 30, pax: 2200, equip: 350 },
+];
+// inc: null | 'stall' | 'fire'. tSim = incident clock (s, compressed); tOn = when the TVS mode was commanded
+const S = { tab: 'vent', load: 2, airflow: true, heat: false, labels: true, inc: null, fireAt: 'rear', auto: true, tSim: 0, tOn: null, fullAt: null, fs: 0, cine: false, t: 0, phA: 0.1, phB: 0.6 };
+const V = { heat: 1.7, platT: 28, tunT: 33, stallT: 33, air: 2.7 };   // displayed (smoothed)
+
+// ---------- TVS rules (TVS DataBank record ids in brackets) ----------
+let SIM_K = 6;                                     // incident clock runs 6x real time
+const TRIG = 46;                                     // congestion start: train AC condenser inlet nears 46 °C [M04]
+const T_DET = 20, T_DMP = 25, T_FAN = 50;            // illustrative: fire detection, damper stroke, fan run-up (s)
+const LIMIT_FULL = 180;                              // NFPA 130 (2017) 7.2.1(3) [N01]
+const STALL_X = -170, SHAFT = { sta: -87, adj: -232 };
+const FIRE_X = { rear: -228, front: -112 };          // train A runs +x: its front faces this station
+const MODES = {
+  normal: { name: 'Normal · open', tag: 'prac', rule: 'Fans off. Draught relief (DRD) and shaft (SD) dampers open: piston air breathes through the shafts.' },   // [M01, M02]
+  watch: { name: 'Normal · monitoring', tag: 'prac', rule: 'Train stopped, piston effect gone. Fans stay off until the AC condenser air nears 46 °C.' },               // [M04]
+  hold: { name: 'TVS held off', tag: 'illus', rule: 'What-if: no tunnel ventilation response. Real systems have standby fans, dual power and manual override.' },
+  congestion: { name: 'Congestion · push-pull', tag: 'prac', rule: 'The station nearer the stalled train supplies, the farther one extracts. Air sweeps the train.' },   // [M04, C02]
+  emergency: { name: 'Emergency · push-pull', tag: 'code', rule: 'Direction set by fire location: smoke driven away from the evacuation side at or above critical velocity.' },   // [M05, C03, C04]
+};
+// dir +1: air flows west → east (adjacent station supplies, this station's west end extracts); -1 the reverse
+function tvs() {
+  if (!S.inc) return { mode: 'normal', dir: 0 };
+  if (!S.auto) return { mode: 'hold', dir: 0 };
+  if (S.tOn === null || S.tSim < S.tOn) return { mode: S.inc === 'stall' ? 'watch' : 'emergency', dir: 0, pending: true };
+  const dir = S.inc === 'stall'
+    ? (Math.abs(STALL_X - SHAFT.adj) < Math.abs(STALL_X - SHAFT.sta) ? 1 : -1)   // nearer station supplies [M04]
+    : (S.fireAt === 'front' ? 1 : -1);                                             // passengers walk away from the fire; smoke goes the other way [C03]
+  return { mode: S.inc === 'stall' ? 'congestion' : 'emergency', dir };
+}
+const role = (dir, end) => !dir ? 'off' : ((end === 'W') === (dir > 0) ? 'extract' : 'supply');
+// damper line-up per role (schematic; project line-ups differ) [E08, E11; line-up INFERRED]
+const LINEUP = {
+  off: { DRD: 'o', SD: 'o', FID: 'c', NZD: 'c', SRD: 'c' },
+  supply: { DRD: 'c', SD: 'o', FID: 'o', NZD: 'o', SRD: 'c' },
+  extract: { DRD: 'c', SD: 'o', FID: 'o', NZD: 'c', SRD: 'o' },
+};
+const evacToStation = () => S.fireAt === 'rear';
+function targets() {
+  const L = LOADS[S.load];
+  const tph = S.inc ? 0 : L.tph;                      // incident: no trains admitted into the section (INFERRED)
+  const train = tph * 38, people = L.pax * 0.12, equip = L.equip, stallAC = S.inc ? 160 + 160 : 0;   // stalled + held train AC
+  const ote = train * 0.5;
+  const rest = train + people + equip - ote;
+  const ecs = Math.min(1000, rest);
+  const excess = Math.max(0, rest - ecs);
+  const tunT = 25 + tph * 0.27;
+  const fs = S.fs;
+  return {
+    tph,
+    heat: (train + people + equip + stallAC + fs * 400) / 1000,
+    platT: 24 + excess / 60 + (train + people) / 900,
+    tunT,
+    stallT: S.inc === 'stall' ? 50 - 17 * fs : S.inc === 'fire' ? 58 - 28 * fs : tunT,
+    air: S.inc ? 0.1 + (S.inc === 'fire' ? 3.0 : 2.5) * fs : L.tph * 0.09,
+  };
+}
+
+// ---------- airflow as CFD-style fume ----------
+// Emitters release puffs at real sources (tunnel portals, train roofs, supply diffusers, fans). The mean flow carries
+// them along a route; a coherent eddy field stirs them, so neighbours swirl together instead of marching in a line;
+// the stream widens downstream and thins as it mixes. Illustrative flow, not CFD output.
+function mkPath(points, o) {
+  const pts = points.map(p => new THREE.Vector3(...p)); const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  return { pts, cum, len: cum.at(-1), ...o };
+}
+function sample(P, u, out) {
+  const d = u * P.len; let i = 1;
+  while (i < P.cum.length - 1 && P.cum[i] < d) i++;
+  const seg = P.cum[i] - P.cum[i - 1], f = seg > 0 ? (d - P.cum[i - 1]) / seg : 0;
+  return out.lerpVectors(P.pts[i - 1], P.pts[i], f);
+}
+// eddy field: curl of a drifting potential (two octaves), so the stirring is swirl-like and space-coherent
+function eddy(x, y, z, t, out) {
+  return out.set(
+    Math.sin(0.21 * z + 0.7 * t) + 0.55 * Math.sin(0.53 * y - 1.1 * t),
+    Math.sin(0.21 * x + 0.9 * t) + 0.55 * Math.sin(0.53 * z + 1.3 * t),
+    Math.sin(0.21 * y + 0.6 * t) + 0.55 * Math.sin(0.53 * x - 0.8 * t));
+}
+const G0 = Y.ground, G = Y.ground + 4;
+const rnd = (a = 1) => (Math.random() * 2 - 1) * a;
+const K_FLOW = 8;                                  // visual time scale: tunnel puffs move at the air-speed readout × K_FLOW (shown in the frame)
+const piston = () => Math.max(0.1, V.air) * K_FLOW;
+const trainsOn = () => LOADS[S.load].tph > 0;
+const FLOWS = [];
+// piston air along the tunnels and the station trackway (the stalled section slows to a crawl and heats up)
+for (const [dir, z, key] of [[1, -8, 'A'], [-1, 8, 'B']]) {
+  [[-TUN_X, -90], [-90, 90], [90, TUN_X]].forEach(([a, b], seg) => {
+    const stallSeg = key === 'A' && seg === 0;
+    FLOWS.push({
+      kind: 'piston', n: seg === 1 ? 220 : 320, P: mkPath(dir > 0 ? [[a, Y.tun, z], [b, Y.tun, z]] : [[b, Y.tun, z], [a, Y.tun, z]], {}),
+      r0: [3, 2.2, 2.2], r1: [3, 2.6, 2.6], stir: 0.9, size: 3.4, a: 0.8,
+      active: () => stallSeg && S.inc === 'stall' ? S.fs < 0.05 : (trainsOn() && !S.inc),
+      speed: piston,
+      temp: () => stallSeg && S.inc ? V.stallT : V.tunT,
+    });
+  });
+}
+// brake and AC heat lifts off the train roof into the over-track exhaust duct (y 5.6-6.6, behind the screen doors),
+// runs to the nearer end and up the shaft. Normal service only.
+for (const z of TRACK_Z) FLOWS.push({
+  kind: 'exhaust', z, n: 420, route: () => {
+    const x0 = rnd(56), s = x0 < 0 ? -1 : 1;
+    return [[x0, 4.2, z + rnd(1)], [x0 + s * 2, 5.7, z], [x0 + s * 6, 6.1, z], [s * 58, 6.1, z], [s * 80, 6.4, z], [s * 87, 7.8, -7], [s * 87, G0 + 4, -7]];
+  },
+  r0: [0.6, 0.15, 0.6], r1: [1.8, 0.45, 1.2], stir: 0.6, size: 1.5, a: 1,
+  active: () => trainsOn() && !S.inc, speed: () => 7, temp: u => V.tunT + 13 * (1 - 0.6 * u),
+});
+// incident: the held train (track B, at the platform) still sheds AC heat. What the over-track exhaust does in an
+// incident is not in our sources, so the heat is drawn rising into the duct zone and staying local: never routed
+// into a shaft that may be supplying (INFERRED).
+FLOWS.push({
+  n: 160, route: () => { const x0 = rnd(60); return [[x0, 4.2, 8 + rnd(1)], [x0 + rnd(2), 5.6, 8], [x0 + rnd(5), 6.1, 8 + rnd(0.8)]]; },
+  r0: [0.6, 0.15, 0.6], r1: [2.2, 0.4, 1.1], stir: 0.6, size: 1.6, a: 0.9,
+  active: () => !!S.inc && trainsOn(), speed: () => 0.7, temp: u => V.tunT + 6 * (1 - 0.5 * u),
+});
+// normal mode: piston air relieved through the open DRD and SD [M01]
+for (const s of [-1, 1]) FLOWS.push({
+  kind: 'relief', n: 110, P: mkPath([[s * 70, 4, -8], [s * 86, 5.5, -7.5], [s * 87, 7.5, -7], [s * 87, G0 + 4, -7]], {}),
+  r0: [1, 1.2, 1.2], r1: [2, 2.4, 2.6], stir: 0.9, size: 2.6, a: 0.9,
+  active: () => trainsOn() && !S.inc, speed: () => piston() * 0.8, temp: () => V.tunT,
+});
+// station cooling: AHU supply diffusers; cool jets drop, spread across the room and warm up as they pick up heat
+const ecsOn = () => S.load > 0;                     // public-area AC off in engineering hours (equipment rooms stay ventilated, not shown)
+const ROOM = {
+  plat: { x0: -70, x1: 70, y0: 1.4, y1: 6.8, z0: -4.7, z1: 4.7 },
+  conc: { x0: -60, x1: 60, y0: 8.3, y1: 12.6, z0: -13.8, z1: -0.3 },
+};
+for (const s of [-1, 1]) {
+  for (const dx of [8, 38, 50, 62]) for (const dz of [-2.8, 2.8]) FLOWS.push({
+    kind: 'supply', at: [s * dx, 6.7, dz], s, n: 60, room: ROOM.plat, route: () => {
+      const sz = Math.sign(dz);
+      return [[s * dx + rnd(0.4), 6.7, dz], [s * dx + rnd(1), 4.4, dz * 0.9], [s * dx + rnd(5), 2.4, sz * (3 + Math.random() * 1.2)], [s * dx + rnd(9), 2.2 + Math.random() * 3.5, sz * 4.4]];
+    },
+    r0: [0.3, 0.3, 0.3], r1: [2.4, 1.1, 0.9], stir: 0.8, size: 1.7, a: 0.8,
+    active: ecsOn, speed: () => 2.6, temp: u => 17 + (V.platT - 17) * Math.min(1, u * 1.3),
+  });
+  for (const dx of [6, 20, 42]) for (const dz of [-10, -5]) FLOWS.push({
+    kind: 'supply', at: [s * dx, 12.3, dz], s, n: 45, room: ROOM.conc, route: () => [[s * dx + rnd(0.4), 12.3, dz], [s * dx + rnd(1.5), 10.6, dz + rnd(1)], [s * dx + rnd(7), 9.0, dz + rnd(3)], [s * dx + rnd(10), 9.5 + Math.random() * 2.5, dz + rnd(4)]],
+    r0: [0.3, 0.3, 0.3], r1: [2.6, 1.2, 1.8], stir: 0.8, size: 1.9, a: 0.8,
+    active: ecsOn, speed: () => 2.4, temp: u => 17 + (V.platT - 18.5) * Math.min(1, u * 1.3),
+  });
+}
+// return air: room air drawn up into the grilles and ducted back to the AHU (warmest air in the loop)
+for (const s of [-1, 1]) {
+  for (const gx of RET_P) FLOWS.push({
+    kind: 'return', at: [s * gx, 6.0, -4.35], s, n: 40, route: () => [[s * gx + rnd(6), 2.6 + Math.random() * 3, rnd(3.6)], [s * gx, 6.0, -4.35], [s * gx, 6.5, -4.35], [s * 60.6, 6.5, -4.35], [s * 60.6, 12.4, -4.35], [s * 59.5, 12.4, -8.5], [s * 56, 12.0, -9]],
+    r0: [1.4, 0.8, 1.1], r1: [1.4, 0.8, 1.1], rf: u => 1 - 0.85 * sstep(0.04, 0.12, u), stir: 0.7, size: 1.4, a: 0.65,
+    active: ecsOn, speed: () => 3, temp: () => V.platT + 0.5,
+  });
+  for (const gx of RET_C) FLOWS.push({
+    kind: 'returnC', at: [s * gx, 12.7, -13.3], s, n: 35, route: () => [[s * gx + rnd(6), 9.5 + Math.random() * 2.5, -5 - Math.random() * 6], [s * gx, 12.7, -13.3], [s * gx, 13.4, -13.5], [s * 50.5, 13.4, -13.5], [s * 50.5, 13.3, -10], [s * 54, 12.4, -9.5]],
+    r0: [1.4, 0.8, 1.1], r1: [1.4, 0.8, 1.1], rf: u => 1 - 0.85 * sstep(0.08, 0.2, u), stir: 0.7, size: 1.5, a: 0.65,
+    active: ecsOn, speed: () => 3, temp: () => V.platT - 1,
+  });
+}
+// push-pull through the plant chain [E11]: street → SD → shaft → FID → TVFs → NZD → nozzle → tunnel (supply), reverse via SRD (extract)
+const staSupply = [[-87, G, -7], [-87, 11, -7], [-81, 10.4, -9], [-73, 10.4, -9], [-66, 10.4, -8], [-66, 7.6, -8], [-72, 5, -8], [-90, Y.tun + 0.6, -8]];
+const staExtract = [[-90, Y.tun + 0.6, -8], [-63.3, 4.5, -8], [-63.3, 7.6, -8], [-63.3, 10.4, -9], [-73, 10.4, -9], [-81, 10.4, -9], [-87, 11, -7], [-87, G, -7]];
+const adjSupply = [[-232, G, -7], [-232, Y.tun + 0.6, -8]];
+// air temperature along the push-pull path: rises across the stalled train (or downstream of the fire)
+function ppTemp(p, d) {
+  const cl = v => Math.min(1, Math.max(0, v));
+  if (S.inc === 'stall') return 27 + 0.85 * (V.stallT - 27) * cl(d > 0 ? (p.x + 235) / 130 : (-105 - p.x) / 130);
+  if (S.inc === 'fire') return 27 + 26 * cl((p.x - FIRE_X[S.fireAt]) * d / 25);
+  return 27;
+}
+const PP = {
+  1: mkPath([...adjSupply, ...staExtract], {}),                          // adjacent supplies, west end extracts
+  [-1]: mkPath([...staSupply, ...[...adjSupply].reverse()], {}),         // west end supplies, adjacent extracts
+};
+for (const d of [1, -1]) FLOWS.push({
+  kind: 'pp', n: 480, P: PP[d], r0: [1.5, 1.4, 1.4], r1: [2.5, 2.4, 2.4], stir: 1, size: 3, a: 0.9,
+  active: () => { const T = tvs(); return T.dir === d && S.fs > 0.02; }, speed: piston, temp: (u, p) => ppTemp(p, d), amb: T => 1 - sstep(27.5, 33, T),
+});
+const NP = FLOWS.reduce((a, F) => a + F.n, 0);
+// puffs: camera-facing sprites with a drifting smoke texture (value-noise fbm); overlapping puffs build the volume
+const PUFF_VS = `attribute float aSize; attribute vec4 aCol; attribute float aSeed; uniform float uPx;
+varying vec4 vCol; varying float vSeed;
+void main() {
+  vCol = aCol; vSeed = aSeed;
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = min(aSize * uPx * projectionMatrix[1][1] / max(-mv.z, 0.1), 320.0);
+  gl_Position = projectionMatrix * mv;
+}`;
+const PUFF_FS = `uniform float uTime; varying vec4 vCol; varying float vSeed;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
+void main() {
+  vec2 p = gl_PointCoord * 2.0 - 1.0;
+  float r = length(p);
+  if (r > 1.0) discard;
+  float a = vSeed * 6.2832 + uTime * (fract(vSeed * 7.31) - 0.5) * 0.6;     // slow roll
+  vec2 q = mat2(cos(a), -sin(a), sin(a), cos(a)) * p;
+  vec2 o = vec2(vSeed * 37.0, vSeed * 91.0);
+  float n = 0.55 * vn(q * 2.2 + o + uTime * 0.15) + 0.3 * vn(q * 4.7 - o - uTime * 0.25) + 0.15 * vn(q * 9.0 + o);
+  float body = pow(max(1.0 - r * r, 0.0), 1.3);            // max(): r*r can round past 1 -> pow(neg) = NaN -> black bloom blocks
+  float wisp = smoothstep(0.25, 0.75, n * (0.65 + 0.6 * body));
+  gl_FragColor = vec4(clamp(vCol.rgb, 0.0, 1.0), clamp(vCol.a * body * wisp * 1.6, 0.0, 1.0));
+}`;
+const puffU = { uPx: { value: 1 }, uTime: { value: 0 } };
+function puffCloud(n, order) {
+  const g = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 4), size = new Float32Array(n);
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('aCol', new THREE.BufferAttribute(col, 4).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('aSize', new THREE.BufferAttribute(size, 1).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('aSeed', new THREE.BufferAttribute(Float32Array.from({ length: n }, () => Math.random()), 1));
+  const pts = new THREE.Points(g, new THREE.ShaderMaterial({ uniforms: puffU, vertexShader: PUFF_VS, fragmentShader: PUFF_FS, transparent: true, depthWrite: false }));
+  pts.frustumCulled = false; pts.renderOrder = order; scene.add(pts);
+  return {
+    set(i, p, c, al, sz) { if (!Number.isFinite(p.x + p.y + p.z + c.r + c.g + c.b + al + sz)) { this.hide(i); return; } pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z; col.set([c.r, c.g, c.b, al], i * 4); size[i] = sz; },
+    hide(i) { size[i] = 0; col[i * 4 + 3] = 0; },
+    commit() { for (const k of ['position', 'aCol', 'aSize']) g.attributes[k].needsUpdate = true; },
+  };
+}
+const air = puffCloud(NP, 2);
+const AMBIENT = new THREE.Color(0x8fb8c6);      // outside (street) air, before it picks up heat: keyed in the legend
+const parts = [];
+function respawn(d, init) {
+  const F = FLOWS[d.fi];
+  d.P = F.route ? mkPath(F.route(), {}) : F.P;
+  d.u = init ? Math.random() : Math.random() * 0.02;
+  d.off.set(rnd(F.r0[0]), rnd(F.r0[1]), rnd(F.r0[2]));
+  d.k = 0.75 + Math.random() * 0.5;
+}
+FLOWS.forEach((F, fi) => { for (let i = 0; i < F.n; i++) { const d = { fi, off: new THREE.Vector3() }; respawn(d, true); parts.push(d); } });
+const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _c = new THREE.Color(), _q = new THREE.Quaternion();
+const _b = new THREE.Vector3(), _sc = new THREE.Vector3(), _e = new THREE.Vector3();
+const HIDE = new THREE.Matrix4().compose(new THREE.Vector3(0, -999, 0), new THREE.Quaternion(), new THREE.Vector3(0, 0, 0));
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const clampAbs = (v, r) => Math.max(-r, Math.min(r, v));
+const airOn = () => S.airflow && S.tab !== 'egr';   // the Egress tab hides the airflow so people read clearly
+function updateDots(dt) {
+  const act = FLOWS.map(F => airOn() && F.active());
+  const spd = FLOWS.map(F => F.speed());
+  const t = S.t;
+  parts.forEach((d, i) => {
+    const F = FLOWS[d.fi];
+    if (!act[d.fi]) { air.hide(i); return; }
+    d.u += spd[d.fi] * d.k * dt / d.P.len;
+    if (d.u >= 1) respawn(d, false);
+    sample(d.P, d.u, _p);
+    // eddies stir the puff off its stream line; a weak pull and a widening tube keep the stream coherent
+    const u = d.u, rf = F.rf ? F.rf(u) : 1;                                // rf: a stream that narrows into a duct
+    const rx = (F.r0[0] + (F.r1[0] - F.r0[0]) * u) * rf, ry = (F.r0[1] + (F.r1[1] - F.r0[1]) * u) * rf, rz = (F.r0[2] + (F.r1[2] - F.r0[2]) * u) * rf;
+    eddy(_p.x + d.off.x, _p.y + d.off.y, _p.z + d.off.z, t, _e);
+    d.off.x = clampAbs(d.off.x + (_e.x * F.stir * rx - d.off.x * 0.35) * dt, rx);
+    d.off.y = clampAbs(d.off.y + (_e.y * F.stir * ry - d.off.y * 0.35) * dt, ry);
+    d.off.z = clampAbs(d.off.z + (_e.z * F.stir * rz - d.off.z * 0.35) * dt, rz);
+    _p.add(d.off);
+    const R = F.room;
+    if (R) { _p.x = Math.min(R.x1, Math.max(R.x0, _p.x)); _p.y = Math.min(R.y1, Math.max(R.y0, _p.y)); _p.z = Math.min(R.z1, Math.max(R.z0, _p.z)); }
+    const T = F.temp(u, _p), hot = Math.min(1, Math.max(0, (T - 18) / 28));
+    // concentration: hot air is dense and red; as it mixes out it thins through orange and yellow to green / blue
+    const al = (0.16 + 0.4 * hot) * F.a * (HAZE[F.kind] ?? 1) * sstep(0, 0.08, u) * (1 - sstep(0.82, 1, u));
+    tempColor(T, _c); if (F.amb) _c.lerp(AMBIENT, F.amb(T));
+    air.set(i, _p, _c, al, F.size * 1.3 * (0.75 + 0.6 * u) * (0.85 + 0.3 * d.k) * (1.1 - 0.25 * hot));
+  });
+  air.commit();
+}
+
+// ---------- flow ribbons: one glowing stream per air path, pulses travel downstream at the flow speed, arrowhead at the outlet.
+// They carry the direction at a glance (and in a still frame); the puffs underneath stay as the mixing haze.
+const HAZE = { piston: 0.22, exhaust: 0.35, relief: 0.5, pp: 0.5, supply: 0.5, return: 0.5, returnC: 0.5 };
+const RIB_VS = `attribute vec3 aCol; varying vec3 vCol; varying float vU; varying float vF;
+void main() {
+  vCol = aCol; vU = uv.x;
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vF = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz)));   // facing the eye: reads as a round glowing tube
+  gl_Position = projectionMatrix * mv;
+}`;
+const RIB_FS = `uniform float uPh, uLen, uSp, uOp, uTail; varying vec3 vCol; varying float vU; varying float vF;
+void main() {
+  float ph = fract((vU * uLen - uPh) / uSp);
+  float pulse = ph * ph * ph * ph;                                  // bright head downstream, long fading tail behind it
+  float ends = smoothstep(0.0, 0.05, vU) * (1.0 - uTail * smoothstep(0.94, 1.0, vU));
+  float a = (0.22 + 0.78 * pulse) * (0.3 + 0.7 * vF) * ends * uOp;
+  gl_FragColor = vec4(vCol * (0.85 + 1.8 * pulse), a);
+}`;
+const RIBS = [], _up = new THREE.Vector3(0, 1, 0);
+function ribbon(F, pts, r, sp, head = true) {
+  const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)), false, 'centripetal');
+  const L = curve.getLength(), segs = Math.max(8, Math.min(260, Math.round(L / 1.2))), RAD = 8;
+  const geo = new THREE.TubeGeometry(curve, segs, r, RAD, false);
+  const col = new Float32Array(geo.attributes.position.count * 3);
+  geo.setAttribute('aCol', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uPh: { value: 0 }, uLen: { value: L }, uSp: { value: sp }, uOp: { value: 0 }, uTail: { value: head ? 0 : 1 } },
+    vertexShader: RIB_VS, fragmentShader: RIB_FS, transparent: true, depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat); mesh.renderOrder = 1; mesh.visible = false; scene.add(mesh);
+  const ring = Array.from({ length: segs + 1 }, (_, i) => curve.getPointAt(i / segs));
+  const R = { F, mesh, mat, ring, segs, RAD, col, op: 0, ph: Math.random() * sp };
+  if (head) {
+    const t = curve.getTangentAt(1), h = new THREE.Mesh(new THREE.ConeGeometry(r * 2.4, r * 6, 16),
+      new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0 }));
+    h.quaternion.setFromUnitVectors(_up, t); h.position.copy(ring.at(-1)).addScaledVector(t, r * 3);
+    h.renderOrder = 1; h.visible = false; scene.add(h); R.head = h;
+  }
+  RIBS.push(R); return R;
+}
+function recolor(R) {
+  const { F, ring, segs, RAD, col } = R;
+  for (let i = 0; i <= segs; i++) {
+    const T = F.temp(i / segs, ring[i]); tempColor(T, _c); if (F.amb) _c.lerp(AMBIENT, F.amb(T));
+    for (let j = 0; j <= RAD; j++) col.set([_c.r, _c.g, _c.b], (i * (RAD + 1) + j) * 3);
+  }
+  R.mesh.geometry.attributes.aCol.needsUpdate = true;
+  if (R.head) R.head.material.color.copy(_c).multiplyScalar(1.6);
+}
+const RIB_Y = 4.9;                                    // tunnel streams run above the train roof (y 3.7), under the crown
+for (const F of FLOWS) {
+  const P = F.P && F.P.pts.map(p => [p.x, p.y, p.z]);
+  if (F.kind === 'piston') ribbon(F, P.map(([x, , z]) => [x, RIB_Y, z]), 0.32, 16, false);
+  else if (F.kind === 'relief') { P[0][1] = RIB_Y; ribbon(F, P, 0.35, 7); }
+  else if (F.kind === 'pp') ribbon(F, P.map(([x, y, z]) => [x, y === Y.tun + 0.6 ? RIB_Y : y, z]), 0.45, 16);
+  else if (F.kind === 'exhaust') for (const k of [-1, 1]) {
+    const z = F.z; ribbon(F, [[k * 26, 4.4, z], [k * 29, 5.7, z], [k * 33, 6.1, z], [k * 58, 6.1, z], [k * 80, 6.4, z], [k * 87, 7.8, -7], [k * 87, G0 + 4, -7]], 0.24, 8);
+  }
+  else if (F.kind === 'supply') {
+    const [x, y, z] = F.at, k = F.s;
+    if (F.room === ROOM.plat) { const sz = Math.sign(z); ribbon(F, [[x, y, z], [x, 4.8, z * 0.95], [x + k * 1.6, 3.0, sz * 3.5], [x + k * 3.8, 2.5, sz * 4.2]], 0.13, 2.4); }
+    else ribbon(F, [[x, y, z], [x, 10.9, z], [x + k * 2.2, 9.5, z + 0.8], [x + k * 5, 9.1, z + 1.4]], 0.14, 2.4);
+  }
+  else if (F.kind === 'return') { const [x, , z] = F.at; ribbon(F, [[x + F.s * 3, 3.0, -1.2], [x + F.s * 1, 5.0, -3.4], [x, 6.0, z]], 0.12, 2.4); }
+  else if (F.kind === 'returnC') { const [x, , z] = F.at; ribbon(F, [[x + F.s * 3, 9.8, -7], [x + F.s * 1, 11.8, -11.6], [x, 12.7, z]], 0.12, 2.4); }
+}
+let ribTick = 0;
+function updateRibbons(dt) {
+  const on = airOn(), recol = (ribTick = (ribTick + 1) % 6) === 0;
+  for (const R of RIBS) {
+    const want = on && R.F.active() ? 1 : 0;
+    R.op += (want - R.op) * Math.min(1, dt * 3);
+    const vis = R.op > 0.01;
+    R.mesh.visible = vis; if (R.head) R.head.visible = vis;
+    if (!vis) continue;
+    R.ph += R.F.speed() * dt;
+    R.mat.uniforms.uPh.value = R.ph; R.mat.uniforms.uOp.value = R.op;
+    if (R.head) R.head.material.opacity = 0.85 * R.op;
+    if (recol || R.op < 0.2) recolor(R);
+  }
+}
+
+// ---------- fire smoke: plume -> crown layer -> downstream to the extract shaft, backlayer upstream (illustrative, not CFD) ----------
+const NS = 1200, CROWN = Y.tun + Y.tunR - 0.5;
+const smoke = puffCloud(NS, 3);
+const SM = Array.from({ length: NS }, () => ({ live: false }));
+const SMK_HOT = new THREE.Color(0xff7a2a), SMK_DARK = new THREE.Color(0x30343a), SMK_THIN = new THREE.Color(0x85888b);
+const EXTRACT = {
+  1: mkPath([[-66, CROWN, -8], [-63.3, 4.5, -8], [-63.3, 7.6, -8], [-63.3, 10.4, -9], [-81, 10.4, -9], [-87, 11, -7], [-87, G, -7], [-85.5, G + 5, -6], [-83, G + 11, -4]], {}),   // via SRD, TVFs, shaft, then a plume over the shaft head
+  [-1]: mkPath([[-232, CROWN, -8], [-232, G, -7], [-230.5, G + 5, -6], [-228, G + 11, -4]], {}),                                                                            // adjacent station shaft
+};
+const DRAFT = {};                                    // what-if TVS failed: hot smoke rises out of the open shafts by natural draft and plumes over the street (illustrative)
+for (const sx of [SHAFT.sta, SHAFT.adj]) DRAFT[sx] = mkPath([[sx, CROWN, -8], [sx, 7.5, -7], [sx, G, -7], [sx + 1.5, G + 5, -6], [sx + 4, G + 11, -4]], {});
+const BACK_MAX = 46;          // illustrative backlayer reach with no airflow (m)
+let smokeAcc = 0;
+function updateSmoke(dt) {
+  const on = S.inc === 'fire', T = tvs(), aDir = T.dir || 1, fs = T.dir ? S.fs : 0, fx = FIRE_X[S.fireAt];
+  const depth = 0.5 + 1.5 * Math.min(1, S.tSim / 150) * (1 - 0.5 * fs);   // layer deepens while the fire burns
+  if (on) {
+    smokeAcc = Math.min(smokeAcc + dt * (16 + 16 * Math.min(1, S.tSim / 90)), 3);
+    for (const p of SM) {
+      if (smokeAcc < 1) break;
+      if (p.live) continue;
+      smokeAcc -= 1;
+      const up = Math.random() < 0.5 * (1 - fs);                             // share of smoke spreading against the airflow
+      Object.assign(p, { live: true, ph: 0, age: 0, x: fx + (Math.random() - 0.5) * 2.5, y: 4.3, z: -8 + (Math.random() - 0.5) * 1.2,
+        side: up ? -aDir : aDir, ly: CROWN - Math.random() * depth, lz: -8 + (Math.random() - 0.5) * 3.4, u: 0, s: 0.45 + Math.random() * 0.35 });
+    }
+  }
+  SM.forEach((p, i) => {
+    if (!on) p.live = false;
+    if (!p.live) { smoke.hide(i); return; }
+    p.age += dt;
+    if (p.ph === 0) {                                                        // buoyant plume rises to the crown
+      p.y += 5.5 * dt; p.x += aDir * fs * 4 * dt;
+      if (p.y >= p.ly) p.ph = 1;
+      _c.copy(SMK_HOT).lerp(SMK_DARK, Math.min(1, Math.max(0, (p.y - 4.3) / Math.max(0.3, p.ly - 4.3))));
+    } else if (p.ph === 1) {                                                 // ceiling layer
+      const down = p.side === aDir;
+      let vx = p.side * 3.2 + aDir * fs * (down ? 14 : 6);                   // backlayer is pushed back once the fans build up
+      const fail = T.mode === 'hold';
+      if (fail) vx = p.side * 2.6;                                           // no fans: slow spread both ways, no reach cap
+      else if (!down && (p.x - fx) * aDir < -BACK_MAX && vx * aDir < 0) vx = 0;   // backlayer stalls at its reach
+      const px = p.x;
+      p.x += vx * dt;
+      if (fail) {
+        for (const sx of [SHAFT.sta, SHAFT.adj]) if ((px - sx) * (p.x - sx) <= 0 && Math.random() < 0.6) { p.ph = 2; p.u = 0; p.P = DRAFT[sx]; }
+        if (p.ph === 1 && p.x > -70) { p.ph = 3; p.ly = 5.3 + Math.random() * 1.0; p.lz = -8 + (Math.random() - 0.5) * 2; p.reach = -40 + Math.random() * 90; }
+      } p.y += (p.ly - p.y) * Math.min(1, dt * 2); p.z += (p.lz - p.z) * Math.min(1, dt * 1.5);
+      if (T.dir && fs > 0.05 && (aDir > 0 ? p.x >= -66 : p.x <= -232)) { p.ph = 2; p.u = 0; p.P = EXTRACT[aDir]; }
+      if (p.ph === 1 && ((p.x > -70 && !T.dir) || p.x < -240 || p.age > (T.mode === 'hold' ? 45 : 20))) p.live = false;
+      _c.copy(SMK_DARK).lerp(SMK_THIN, Math.min(1, p.age / 14));
+    } else if (p.ph === 3) {                                                 // what-if: station trackway, under the slab, slowing
+      p.x += Math.max(0.3, 2.2 - 0.03 * (p.x + 70)) * dt; p.y += (p.ly - p.y) * Math.min(1, dt); p.z += (p.lz - p.z) * Math.min(1, dt);
+      if (p.x > p.reach) { if (Math.random() < 0.35 * dt) { p.ph = 4; p.lz = -4 + Math.random() * 8; p.ly = 5.2 + Math.random() * 0.8; } else p.x = p.reach; }
+      if (p.age > 70 || S.inc !== 'fire' || T.mode !== 'hold') p.live = false;
+      _c.copy(SMK_DARK).lerp(SMK_THIN, 0.3);
+    } else if (p.ph === 4) {                                                 // leaks past the screen doors: thin haze under the platform ceiling
+      p.y += (p.ly - p.y) * Math.min(1, dt); p.z += (p.lz - p.z) * Math.min(1, dt * 0.6); p.x += 0.4 * dt;
+      if (Math.random() < 0.08 * dt) { p.ph = 5; p.ox = Math.sign(p.x || 1) * (16 + Math.random() * 14); p.oz = -3.5 + Math.random() * 3; }   // drifts to a stair / escalator opening
+      if (p.age > 80 || S.inc !== 'fire' || T.mode !== 'hold') p.live = false;
+      _c.copy(SMK_DARK).lerp(SMK_THIN, 0.55);
+    } else if (p.ph === 5) {                                                 // what-if: rises through the opening to the concourse
+      const dx = p.ox - p.x, dz = p.oz - p.z, d = Math.hypot(dx, dz);
+      if (d > 0.6) { p.x += dx / d * 1.4 * dt; p.z += dz / d * 1.4 * dt; p.y += (5.6 - p.y) * Math.min(1, dt); }
+      else { p.y += 1.6 * dt; if (p.y > 16) { p.ph = 6; p.ly = 16.5 + Math.random() * 2; p.lz = -12 + Math.random() * 11; p.vx = (Math.random() - 0.5) * 1.6; } }
+      if (p.age > 110 || S.inc !== 'fire' || T.mode !== 'hold') p.live = false;
+      _c.copy(SMK_DARK).lerp(SMK_THIN, 0.5);
+    } else if (p.ph === 6) {                                                 // thin layer under the concourse roof, spreading
+      p.x = Math.max(-58, Math.min(58, p.x + p.vx * dt)); p.y += (p.ly - p.y) * Math.min(1, dt); p.z += (p.lz - p.z) * Math.min(1, dt * 0.4);
+      if (p.age > 140 || S.inc !== 'fire' || T.mode !== 'hold') p.live = false;
+      _c.copy(SMK_DARK).lerp(SMK_THIN, 0.6);
+    } else {                                                                 // out through a shaft: extracting fans, or natural draft
+      const P = p.P || EXTRACT[aDir]; p.u += (T.mode === 'hold' ? 2.5 : 5 + 14 * fs) * dt / P.len;
+      if (p.u >= 1) p.live = false;
+      sample(P, Math.min(1, p.u), _b); p.x = _b.x; p.y = _b.y; p.z = _b.z;
+      if (p.P === DRAFT[SHAFT.sta] || p.P === DRAFT[SHAFT.adj]) { p.dr = 1; _c.copy(SMK_DARK).lerp(SMK_THIN, Math.min(1, p.u * 1.2)); }
+      else { p.dr = 0; _c.copy(SMK_THIN); }
+    }
+    if (!p.live) { smoke.hide(i); return; }
+    const sc = p.s * (0.9 + Math.min(p.age, 8) * 0.22);
+    const al = p.ph === 0 ? 0.75 : p.ph === 1 ? 0.7 - 0.3 * Math.min(1, p.age / 16) : p.ph === 3 ? 0.65 : p.ph === 4 ? 0.32 : p.ph === 5 ? 0.4 : p.ph === 6 ? 0.3 : p.dr ? 0.6 * (1 - 0.7 * Math.max(0, p.u - 0.6) / 0.4) : 0.4 * (1 - 0.75 * Math.min(1, Math.max(0, p.y - G) / 11));    // dense near the fire, thinning downstream
+    eddy(p.x, p.y, p.z, S.t * 1.3, _e);                                      // rolling eddies in the layer
+    const ew = 0.35 + 0.08 * Math.min(p.age, 8);
+    smoke.set(i, _p.set(p.x + _e.x * ew, p.y + _e.y * ew * 0.4, p.z + _e.z * ew), _c, al, sc * 3.6);
+  });
+  smoke.commit();
+}
+
+// ---------- egress: platform → stairs / escalators → concourse → out (hand-calc illustration, not a validated crowd sim) ----------
+// NFPA 130 2017: platform clear ≤ 4 min (5.3.3.1); remote point to a point of safety ≤ 6 min (5.3.3.2);
+// platform walk 37.7 m/min (5.3.4.4); concourse walk 61.0 m/min (5.3.4.5); fare gates 50 p/min each (5.3.8.4); stairs and escalators 0.0555 p/mm-min, 14.6 m/min vertical (5.3.5.3);
+// escalators ≤ half the capacity (5.3.5.4); one escalator out of service, the most adverse (5.3.5.6)
+const EG = { POL: [100, 700, 1500], STAIR_W: 2400, ESC_W: 1000, CAP: 0.0555, V_H: 37.7, V_C: 61.0, V_V: 14.6, RISE: Y.concTop - Y.plat, STREET: Y.ground - Y.concTop, T1_D: 34, GATE: 50, SWING: 60 };
+const EGC = { plat: new THREE.Color(0xd62a1e), vert: new THREE.Color(0xe0a526), conc: new THREE.Color(0x1f9e89) };
+const GATES = [];                                     // per side: 5 gate aisles at 50 p/min (5.3.8.4) + a swing gate at 60 p/min (5.3.7.1)
+for (const s of [-1, 1]) {
+  for (let i = 0; i < 5; i++) GATES.push({ s, z: (GATE_CZ[i] + GATE_CZ[i + 1]) / 2, cap: EG.GATE });
+  GATES.push({ s, z: -6.7, cap: EG.SWING });
+}
+const VW = EG.V_H / 60, VC = EG.V_C / 60;            // platform / concourse walking speed, m per sim second
+const LANES = [];
+for (const s of [-1, 1]) {
+  LANES.push({ s, foot: 29.4, top: 14.3, z: 0, w: 4, spread: 1.8, cap: EG.CAP * EG.STAIR_W, lift: 0 });
+  for (const zi of [0, 1]) {
+    const E = ESC[(s < 0 ? 0 : 2) + zi];
+    if (!E.oos) LANES.push({ s, foot: 30.4, top: 16, z: zi ? ESC_Z : -ESC_Z, w: 2, spread: 0.7, cap: EG.CAP * EG.ESC_W, lift: 0.38 });
+  }
+}
+const exitPt = s => [s * (44 + (Math.random() - 0.5) * 6), -13.3];
+function concRoute(a, s) {                            // concourse: round the opening to the quickest fare gate (walk + queue); unpaid side straight out
+  a.g = null;
+  if (Math.abs(a.x) >= GATE_X) return [exitPt(s)];
+  const pts = [], ax = s * Math.min(GATE_X - 1.5, Math.max(GATE_X - 4, Math.abs(a.x)));
+  if (a.z > -5.5) pts.push([s * 12.5, a.z], [s * 12.5, -5.5]);
+  let best = null, bc = Infinity;
+  for (const g of GATES) if (g.s === s) {
+    const t = plen(a.x, a.z, [...pts, [ax, g.z]]) / VC + g.n * EV.k / (g.cap / 60);
+    if (t < bc) { bc = t; best = g; }
+  }
+  best.n++; a.g = best; pts.push([ax, best.z]);
+  return pts;
+}
+const plen = (x, z, pts) => { let d = 0; for (const [a, b] of pts) { d += Math.hypot(a - x, b - z); x = a; z = b; } return d; };
+EG.T3_D = plen(14.3, 0, [[12.5, 0], [12.5, -5.5], [GATE_X - 4, -9], [GATE_X + 1, -9], [44, -13.3]]);
+function egCalc() {
+  const POL = EG.POL[S.load], stairs = 2 * EG.CAP * EG.STAIR_W, esc = (ESC.length - 1) * EG.CAP * EG.ESC_W, C = stairs + esc;
+  const Fp = POL / C, T1 = EG.T1_D / EG.V_H, T2 = EG.RISE / EG.V_V, T3 = EG.T3_D / EG.V_C, T4 = EG.STREET / EG.V_V;
+  const side = s => LANES.filter(L => L.s === s).reduce((t, L) => t + L.cap, 0), gside = s => GATES.filter(g => g.s === s).reduce((t, g) => t + g.cap, 0);
+  const gIn = Math.max(side(-1), side(1)), gCap = Math.min(gside(-1), gside(1));     // busier side's inflow vs one side's gates
+  const total = Math.max(T1, Fp) + T2 + T3;
+  return { POL, stairs, esc, C, Fp, T1, T2, T3, T4, gIn, gCap, total, street: total + T4 };
+}
+function platRoute(a, L) {                            // along the platform edge strip past the stair / escalator banks
+  const s = L.s, zs = (a.z < 0 ? -1 : 1) * 4.25, pts = [];
+  if (a.x * s < 33.5) pts.push([a.x, zs], [s * 34, zs]);
+  pts.push([s * (L.foot + 1.2), L.z]);
+  return pts;
+}
+const slot = (L, r) => [L.s * (L.foot + 0.6 + 0.55 * Math.floor(r / L.w)), L.z + ((r % L.w) / Math.max(1, L.w - 1) - 0.5) * L.spread];
+const EV = { started: false, A: [], k: 1, nP: 0, platClear: null, allOut: null };
+const _eq = new THREE.Quaternion(), _es = new THREE.Vector3(), _ep = new THREE.Vector3(), _em = new THREE.Matrix4();
+function egPaint(a, c) { a.im.setColorAt(a.i, c); a.im.instanceColor.needsUpdate = true; }
+function egStart() {
+  const c = egCalc();
+  Object.assign(EV, { started: true, A: [], nP: paxPlat.count, platClear: null, allOut: null });
+  EV.k = c.POL / Math.max(1, EV.nP);
+  for (const L of LANES) { L.q = []; L.free = 0; L.n = 0; }
+  for (const g of GATES) { g.q = []; g.free = 0; g.n = 0; }
+  const plat = [];
+  for (let i = 0; i < paxPlat.count; i++) { const h = paxPlat.userData.home[i]; plat.push({ im: paxPlat, i, x: h[0], y: h[1], z: h[2], st: 'walk' }); }
+  const near = a => Math.min(...LANES.map(L => plen(a.x, a.z, platRoute(a, L))));
+  plat.sort((p, q) => near(p) - near(q));
+  for (const a of plat) {                             // people take the quicker option: walk + expected queue
+    let best = null, bc = Infinity;
+    for (const L of LANES) { const t = plen(a.x, a.z, platRoute(a, L)) / VW + L.n * EV.k / (L.cap / 60); if (t < bc) { bc = t; best = L; } }
+    best.n++; a.L = best; a.path = platRoute(a, best); egPaint(a, EGC.plat); EV.A.push(a);
+  }
+  for (let i = 0; i < paxConc.count; i++) {
+    const h = paxConc.userData.home[i], s = h[0] < 0 ? -1 : 1, a = { im: paxConc, i, x: h[0], y: h[1], z: h[2], st: 'conc', s };
+    a.path = concRoute(a, s);
+    egPaint(a, EGC.conc); EV.A.push(a);
+  }
+}
+function egReset() {
+  if (!EV.started) return;
+  EV.started = false; EV.A = [];
+  for (const im of [paxPlat, paxConc]) {
+    for (let i = 0; i < PAX_MAX; i++) { const h = im.userData.home[i]; _em.makeTranslation(h[0], h[1], h[2]); im.setMatrixAt(i, _em); im.setColorAt(i, im.userData.shirt[i]); }
+    im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true;
+  }
+}
+function walk(a, tx, tz, d) {                         // step towards a point; true when there
+  const dx = tx - a.x, dz = tz - a.z, r = Math.hypot(dx, dz);
+  if (r <= d) { a.x = tx; a.z = tz; return true; }
+  a.x += dx / r * d; a.z += dz / r * d; return false;
+}
+function updateEgress(dt) {
+  if (S.inc !== 'fire' || S.tSim < T_DET) { egReset(); return; }
+  if (!EV.started) egStart();
+  const dS = dt * SIM_K, step = VW * dS, stepC = VC * dS;
+  for (const a of EV.A) {
+    if (a.st === 'walk') {
+      if (a.path.length) { if (walk(a, a.path[0][0], a.path[0][1], step)) a.path.shift(); }
+      else { const [x, z] = slot(a.L, a.L.q.length); if (walk(a, x, z, step) || Math.hypot(x - a.x, z - a.z) < 0.5) { a.L.q.push(a); a.st = 'queue'; } }
+      a.y = Y.plat + 0.85;
+    } else if (a.st === 'queue') {
+      const L = a.L, r = L.q.indexOf(a), [x, z] = slot(L, r);
+      const there = walk(a, x, z, step * (r === 0 ? 1 : 0.6));
+      if (r === 0 && there && S.tSim >= L.free) {
+        L.q.shift(); L.free = Math.max(L.free, S.tSim) + EV.k / (L.cap / 60);
+        a.st = 'vert'; a.u = 0; a.vz = a.z; egPaint(a, EGC.vert);
+      }
+    } else if (a.st === 'vert') {
+      const L = a.L; a.u = Math.min(1, a.u + dS / (EG.RISE / EG.V_V * 60));
+      a.x = L.s * (L.foot + (L.top - L.foot) * a.u); a.z = a.vz + (L.z - a.vz) * Math.min(1, a.u * 4);
+      a.y = Y.plat + a.u * EG.RISE + 0.85 + L.lift;
+      if (a.u >= 1) { a.st = 'conc'; a.y = Y.concTop + 0.85; a.s = L.s; a.path = concRoute(a, L.s); egPaint(a, EGC.conc); }
+    } else if (a.st === 'conc' || a.st === 'exit') {
+      if (walk(a, a.path[0][0], a.path[0][1], stepC)) a.path.shift();
+      if (!a.path.length) { if (a.g) { a.g.q.push(a); a.st = 'gq'; } else { a.st = 'out'; a.f = 1; } }
+    } else if (a.st === 'gq') {                       // queue at the fare gate, first come first served
+      const g = a.g, r = g.q.indexOf(a), x = a.s * (GATE_X - 0.7 - 0.6 * r);
+      const there = walk(a, x, g.z, stepC * (r === 0 ? 1 : 0.6));
+      if (r === 0 && there && S.tSim >= g.free) {
+        g.q.shift(); g.n--; g.free = Math.max(g.free, S.tSim) + EV.k / (g.cap / 60);
+        a.g = null; a.st = 'exit'; a.path = [[a.s * (GATE_X + 1), g.z], exitPt(a.s)];
+      }
+    } else if (a.st === 'out') a.f = Math.max(0, a.f - dS / 4);
+    const sc = a.st === 'out' ? a.f : 1;
+    _em.compose(_ep.set(a.x, a.y, a.z), _eq, _es.set(sc, sc, sc)); a.im.setMatrixAt(a.i, _em);
+  }
+  paxPlat.instanceMatrix.needsUpdate = paxConc.instanceMatrix.needsUpdate = true;
+  const el = S.tSim - T_DET;
+  if (EV.platClear === null && !EV.A.some(a => a.st === 'walk' || a.st === 'queue')) EV.platClear = el;
+  if (EV.allOut === null && EV.A.every(a => a.st === 'out')) EV.allOut = el;
+}
+function syncEgress() {
+  const c = egCalc(), on = EV.started, el = on ? S.tSim - T_DET : 0, mm = m => clk(m * 60);
+  const n = st => Math.round(EV.A.filter(a => a.im === paxPlat && st.includes(a.st)).length * EV.k);   // platform occupant load only
+  const pT = EV.platClear ?? el, sT = EV.allOut ?? el;
+  $('evc').style.display = on ? 'block' : 'none';
+  if (on) {
+    $('evH').textContent = EV.allOut !== null ? 'EVACUATION · STATION CLEAR' : EV.platClear !== null ? 'EVACUATION · PLATFORM CLEAR' : 'EVACUATION · ALARM';
+    $('evP').textContent = clk(pT) + ' / 4:00'; $('evS').textContent = clk(sT) + ' / 6:00';
+    $('evPb').style.width = Math.min(100, pT / 2.4) + '%'; $('evSb').style.width = Math.min(100, sT / 3.6) + '%';
+    $('evPb').classList.toggle('late', pT > 240); $('evSb').classList.toggle('late', sT > 360);
+  }
+  $('eName').textContent = !on ? (S.inc === 'fire' ? 'Alarm pending' : 'Start a train fire') : EV.allOut !== null ? 'Station clear' : EV.platClear !== null ? 'Platform clear' : 'Evacuating';
+  $('eName').classList.toggle('hot', on && EV.allOut === null);
+  $('eP').textContent = on ? clk(pT) : '–'; $('eS').textContent = on ? clk(sT) : '–';
+  $('eCnt').textContent = on ? `Of ${egCalc().POL} platform occupants: ${n(['walk', 'queue'])} on platform · ${n(['vert'])} climbing · ${n(['conc', 'gq', 'exit'])} on concourse · ${n(['out'])} out · 1 figure ≈ ${EV.k.toFixed(1)} people` : '';
+  const row = (a, b, v, tag) => `<tr><td>${a}<br><span style="color:var(--ink2);font-size:10.5px">${b}</span></td><td class="v">${v}</td><td class="u">${tag}</td></tr>`;
+  const html =
+    row('Platform occupant load', `${LOADS[S.load].name} · generic input`, c.POL + ' p', 'input') +
+    row('Stairs 2 × 2.4 m', '0.0555 p/mm-min', c.stairs.toFixed(0) + ' p/min', '5.3.5.3') +
+    row('Escalators 4 × 1.0 m', 'one out of service · 1.0 m used, conservative vs 1.228 m (A.5.3.5.3)', c.esc.toFixed(0) + ' p/min', '5.3.5.6') +
+    row('Fp = POL / capacity', `capacity ${c.C.toFixed(0)} p/min`, `${mm(c.Fp)} ${c.Fp <= 4 ? '≤' : '>'} 4:00`, '5.3.3.1') +
+    row('T1 platform walk', `${EG.T1_D} m at 37.7 m/min`, mm(c.T1), '5.3.4.4') +
+    row('T2 climb', `${EG.RISE.toFixed(1)} m at 14.6 m/min`, mm(c.T2), '5.3.5.3') +
+    row('Fare gates 5 + 1 swing per side', `5 × 50 p/min + swing 60 · busier side inflow ${c.gIn.toFixed(0)} p/min${c.gCap >= c.gIn ? ', so no added time' : ''}`, `${c.gCap.toFixed(0)} ${c.gCap >= c.gIn ? '≥' : '<'} ${c.gIn.toFixed(0)}`, '5.3.8.4') +
+    row('T3 concourse walk', `${EG.T3_D.toFixed(0)} m via the gates at 61.0 m/min`, mm(c.T3), '5.3.4.5') +
+    row('Total = max(T1, Fp) + T2 + T3', 'to the concourse exits · point of safety (5.3.3.3)', `${mm(c.total)} ${c.total <= 6 ? '≤' : '>'} 6:00`, '5.3.3.2') +
+    row('+ T4 street climb (check)', `≈ ${EG.STREET.toFixed(0)} m at 14.6 m/min`, `${mm(c.street)} ${c.street <= 6 ? '≤' : '>'} 6:00`, '5.3.3.2');
+  if ($('eCalc').dataset.k !== String(S.load)) { $('eCalc').innerHTML = html; $('eCalc').dataset.k = S.load; }
+}
+
+// ---------- callouts: numbered balloon on a leader + landing, drawing style ----------
+const SVGNS = 'http://www.w3.org/2000/svg';
+const LABELS_ALWAYS = () => true;
+const LABELS = [
+  ['2 TVFs · fan room', [-73, 12.2, -9], '', () => true, 30, -88],
+  ['Vent shaft · SD', [-87, Y.ground + 4.6, -9], '', () => true, -20, -60],
+  ['DRD', [-87, 7.5, -4], '', () => true, -30, 40],
+  ['Nozzle · NZD / SRD', [-66, 6.6, -8], '', () => true, 40, 70],
+  ['Adjacent station TVS · drawn close', [-232, Y.ground + 6, -9], '', () => true, -36, -40],
+  ['Over-track exhaust', [-30, 6.6, -8], 'hot', LABELS_ALWAYS, 54, -70],
+  [() => S.inc === 'fire' ? 'Screen doors · keep trackway smoke off platform' : 'Screen doors', [-25, 3.9, 5], '', () => true, 46, 52],
+  ['Air handling unit', [-56, 13.2, -8], '', () => true, 20, -40],
+  ['Return air → AHU', [-30, 13.8, -13.5], '', () => true, -30, -46],
+  ['Platform', [-48, 1.4, 2], '', () => true, -10, 110],
+  ['Paid area', [-10, Y.concTop + 0.1, -10], '', () => true, -24, -96],
+  ['Fare gates · unpaid area', [-GATE_X, Y.concTop + 1, -8], '', () => true, 30, -110],
+  ['Lifts', [-LIFT_X, Y.concTop + 3.5, 0], '', () => true, 30, -60],
+  ['Escalator · stair · escalator', [-22, 4.3, 0], '', () => true, -20, 130],
+  ['Escalator out of service · NFPA 130 5.3.5.6', [23, 5.0, -ESC_Z], 'hot', () => EV.started, 30, -80],
+  [() => S.inc === 'fire' ? 'Train fire · ' + S.fireAt + ' end' : 'Stalled train', () => S.inc === 'fire' ? [FIRE_X[S.fireAt], 5.5, -8] : [-124, 5.5, -8], 'hot', () => !!S.inc, 24, -70],
+  ['Held train · roof heat (inferred)', [20, 5, 8], '', () => !!S.inc, 50, 44],
+  [() => evacToStation() ? 'Evacuate → this station' : '← Evacuate to adjacent station', () => [-132, 1.2, -6], 'hot', () => S.inc === 'fire', 40, 64],
+].map(([t, p, cls, cond, dx, dy], i) => {
+  const el = document.createElement('div'); el.className = 'lab ' + cls;
+  $('labels').appendChild(el);
+  const g = document.createElementNS(SVGNS, 'g'); g.setAttribute('class', cls);
+  const line = document.createElementNS(SVGNS, 'polyline'), dot = document.createElementNS(SVGNS, 'circle');
+  dot.setAttribute('r', 2.5); g.append(line, dot); $('leaders').appendChild(g);
+  return { el, g, line, dot, n: i + 1, t, txt: '', pf: typeof p === 'function' ? p : null, p: new THREE.Vector3(...(typeof p === 'function' ? p() : p)), cond, dx, dy, pri: cls === 'hot' && cond !== LABELS_ALWAYS };
+});
+function updateLabels() {
+  const vis = [], fr = $('frame').getBoundingClientRect(), m = 8;
+  const FX0 = fr.left + 22 + m, FX1 = fr.right - 22 - m, FY0 = fr.top + 44, FY1 = fr.bottom - 22 - m;
+  for (const L of LABELS) {
+    const on = S.labels && L.cond();
+    if (on) {
+      const t = typeof L.t === 'function' ? L.t() : L.t;
+      if (t !== L.txt) { L.txt = t; L.el.innerHTML = `<i>${L.n}</i>${t}`; }
+      if (L.pf) L.p.set(...L.pf());
+      _p.copy(L.p).project(camera);
+    }
+    const ax = (_p.x + 1) / 2 * innerWidth, ay = (1 - _p.y) / 2 * innerHeight;
+    if (!on || _p.z > 1 || ax < FX0 || ax > FX1 || ay < FY0 || ay > FY1) { L.el.style.display = 'none'; L.g.style.display = 'none'; L.ex = null; continue; }
+    L.el.style.display = ''; L.g.style.display = '';
+    L.ax = ax; L.ay = ay;
+    L.tx = L.ax + L.dx; L.ty = L.ay + L.dy; L.w = L.el.offsetWidth; L.h = L.el.offsetHeight;
+    vis.push(L);
+  }
+  // untangle: swapping the elbows of two crossing leaders always shortens the pair, so this settles with no crossings
+  const cross = (A, B) => {
+    const o = (px, py, qx, qy, rx, ry) => Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px));
+    return o(A.ax, A.ay, A.tx, A.ty, B.ax, B.ay) * o(A.ax, A.ay, A.tx, A.ty, B.tx, B.ty) < 0
+      && o(B.ax, B.ay, B.tx, B.ty, A.ax, A.ay) * o(B.ax, B.ay, B.tx, B.ty, A.tx, A.ty) < 0;
+  };
+  for (let it = 0, hit = true; hit && it < 30; it++) {
+    hit = false;
+    for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) if (cross(vis[i], vis[j])) {
+      const A = vis[i], B = vis[j];
+      [A.tx, B.tx] = [B.tx, A.tx]; [A.ty, B.ty] = [B.ty, A.ty]; hit = true;
+    }
+  }
+  // label boxes: never overlap each other (push apart vertically)
+  const rect = L => { const d = Math.sign(L.tx - L.ax) || 1; return [d > 0 ? L.tx : L.tx - L.w, L.ty - L.h, L.w, L.h]; };
+  // keep each label box inside the drawing frame (flip it to the other side of the elbow if that fits better)
+  const clampIn = L => {
+    let d = Math.sign(L.tx - L.ax) || 1;
+    if (d > 0 && L.tx + L.w > FX1 && L.ax - L.dx - L.w >= FX0) { L.tx = L.ax - Math.abs(L.tx - L.ax); d = -1; }
+    else if (d < 0 && L.tx - L.w < FX0 && L.ax + Math.abs(L.tx - L.ax) + L.w <= FX1) { L.tx = L.ax + Math.abs(L.tx - L.ax); d = 1; }
+    const left = Math.min(FX1 - L.w, Math.max(FX0, d > 0 ? L.tx : L.tx - L.w));
+    L.tx = d > 0 ? left : left + L.w;
+    L.ty = Math.min(FY1, Math.max(FY0 + L.h, L.ty));
+  };
+  for (const L of vis) clampIn(L);
+  for (let it = 0; it < 12; it++) {
+    for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
+      const [ax, ay, aw, ah] = rect(vis[i]), [bx, by, bw, bh] = rect(vis[j]);
+      const ox = Math.min(ax + aw, bx + bw) - Math.max(ax, bx), oy = Math.min(ay + ah, by + bh) - Math.max(ay, by);
+      if (ox > 0 && oy > -3) {
+        const push = oy + 3, up = ay < by ? -1 : 1, A = vis[i], B = vis[j];
+        const wa = A.pri && !B.pri ? 0 : B.pri && !A.pri ? 1 : 0.5;          // incident callouts hold, the others make way
+        A.ty += up * push * wa; B.ty -= up * push * (1 - wa);
+      }
+    }
+    for (const L of vis) clampIn(L);
+  }
+  for (const L of vis) {                                                   // ease the elbow so swaps glide, not jump
+    if (L.ex == null) { L.ex = L.tx; L.ey = L.ty; } else { L.ex += (L.tx - L.ex) * 0.25; L.ey += (L.ty - L.ey) * 0.25; }
+    const dir = Math.sign(L.ex - L.ax) || 1, w = L.w;
+    L.el.style.left = (dir > 0 ? L.ex : L.ex - w) + 'px';
+    L.el.style.top = (L.ey - L.h) + 'px';
+    L.line.setAttribute('points', `${L.ax},${L.ay} ${L.ex},${L.ey} ${L.ex + dir * w},${L.ey}`);
+    L.dot.setAttribute('cx', L.ax); L.dot.setAttribute('cy', L.ay);
+  }
+}
+
+// ---------- trains ----------
+function trainX(ph) {
+  if (ph < 0.35) { const f = ph / 0.35; return -340 + 340 * (1 - (1 - f) * (1 - f)); }
+  if (ph < 0.55) return 0;
+  if (ph < 0.9) { const f = (ph - 0.55) / 0.35; return 340 * f * f; }
+  return null;
+}
+function updateTrains(dt) {
+  const tph = LOADS[S.load].tph;
+  const Tc = tph > 0 ? 420 / tph : Infinity;
+  if (S.inc) S.phB = 0.45;                            // held at the platform, doors open (INFERRED)
+  else { S.phA = (S.phA + dt / Tc) % 1; S.phB = (S.phB + dt / Tc) % 1; }
+  const xa = trainX(S.phA), xb = trainX(S.phB);
+  trainA.visible = tph > 0 && !S.inc && xa !== null; if (xa !== null) trainA.position.x = xa;
+  trainB.visible = tph > 0 && xb !== null; if (xb !== null) trainB.position.x = -xb;
+  trainStall.visible = !!S.inc;
+  if (S.inc === 'stall') trainStall.userData.mat.emissive.copy(tempColor(V.stallT)).multiplyScalar(0.45);
+  else trainStall.userData.mat.emissive.setRGB(0, 0, 0);
+}
+// fire glow at the source (the plume itself is the smoke system)
+const fireGlow = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff6a1a, toneMapped: false }));
+const fireLight = new THREE.PointLight(0xff7a2a, 0, 40, 1.6);
+fireGlow.visible = false; scene.add(fireGlow, fireLight);
+// stall heat bloom: a warm halo round the stalled train, with a pulse on the click so the eye finds it,
+// then tracking the condenser air (cue only, no extra physics)
+const STALL_HALO = new THREE.MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, clippingPlanes: clipX });
+const stallHalo = new THREE.Mesh(new THREE.BoxGeometry(132, 4.2, 3.6), STALL_HALO);
+const stallLight = new THREE.PointLight(0xff8a3a, 0, 70, 1.4);
+stallHalo.visible = false; scene.add(stallHalo, stallLight);
+let stallT0 = null;                                   // wall-clock start of the stall, for the click pulse
+function updateStallBloom() {
+  const on = S.inc === 'stall';
+  stallHalo.visible = on; stallLight.intensity = 0;
+  if (!on) { stallT0 = null; return; }
+  if (stallT0 === null) stallT0 = S.t;
+  stallHalo.position.copy(trainStall.position); stallLight.position.set(trainStall.position.x, 5.5, trainStall.position.z);
+  tempColor(V.stallT, STALL_HALO.color);
+  const heat = sstep(34, 46, V.stallT), kick = Math.max(0, 1 - (S.t - stallT0) / 3) *(0.5 + 0.5 * Math.sin(S.t * 9));
+  STALL_HALO.opacity = 0.06 + 0.22 * heat * (0.85 + 0.15 * Math.sin(S.t * 3)) + 0.3 * kick;
+  stallLight.intensity = 60 * heat + 90 * kick;        // kept low: a hotspot on the wall would read as a fire
+}
+function updateFire() {
+  const on = S.inc === 'fire';
+  PSD_HI.opacity = on ? 0.22 + 0.1 * Math.sin(S.t * 2.5) : 0; for (const m of psdHi) m.visible = on;
+  fireGlow.visible = on; fireLight.intensity = on ? 900 * (0.8 + 0.2 * Math.sin(S.t * 17) * Math.sin(S.t * 7)) : 0;
+  if (on) { fireGlow.position.set(FIRE_X[S.fireAt], 4.6, -8); fireLight.position.copy(fireGlow.position); fireGlow.scale.setScalar(0.85 + 0.2 * Math.sin(S.t * 11)); }
+}
+
+// ---------- notes / UI ----------
+const clk = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function caption(T) {
+  const L = LOADS[S.load], pct = Math.round(S.fs * 100);
+  if (S.inc === 'stall') {
+    if (T.mode === 'hold') return `<span class="sev">TVS held off for comparison.</span> With no piston effect and no fans, the air around the stalled train stands still while its AC keeps dumping heat: <b>${V.stallT.toFixed(0)}°C</b> at the condensers.`;
+    if (T.pending) return `<span class="sev">A train has stopped in the tunnel.</span> The piston effect is gone, and its AC keeps dumping heat into still air: <b>${V.stallT.toFixed(0)}°C</b> at the condensers. The fans stay off until this nears <b>46°C</b>. Other trains are held at stations, so the platform fills up.`;
+    if (S.fs < 1) return `Congestion mode commanded at t+${clk(S.tOn)}. Dampers line up (DRD closes, FID opens), then the fans run up: <b>${pct}%</b>.`;
+    return `Push-pull at full mode. The adjacent station is nearer the train, so it supplies and this station extracts. Air sweeps the train at <b>${V.air.toFixed(1)} m/s</b> and the condenser air falls to <b>${V.stallT.toFixed(0)}°C</b>.`;
+  }
+  if (S.inc === 'fire') {
+    const to = evacToStation() ? 'towards this station' : 'towards the adjacent station';
+    if (T.mode === 'hold') return `<span class="sev">What-if: TVS fails.</span> Smoke spreads both ways under the tunnel crown, over the evacuation route. Hot smoke rises out of the open shafts by natural draft. Some reaches the station trackway; the screen doors hold most of it, but a haze builds under the platform ceiling and rises through the stair and escalator openings to the concourse. Illustrative only.`;
+    if (T.pending) return `<span class="sev">Fire at the ${S.fireAt} end of the train.</span> Passengers will walk ${to}, away from the fire. Until the fans respond, smoke spreads both ways under the crown.`;
+    if (S.fs < 1) return `Emergency mode: fans set to push smoke away from the evacuation route. Dampers line up, then the fans run up: <b>${pct}%</b>. The smoke creeping back upstream (backlayering) shrinks as the airflow builds.`;
+    return `Full mode at <b>t+${S.fullAt} s</b> after the command (NFPA 130 limit: 180 s). Smoke goes to the extracting shaft, and the evacuation route ${to} stays clear. The air speed on the panel is illustrative; the design airflow must be at least the critical velocity for the project's design fire, which is found by analysis.`;
+  }
+  if (S.load === 0) return `Night (engineering hours): no trains, no passengers. The public-area AC is off; equipment rooms stay ventilated (not shown). The station still turns <b>${V.heat.toFixed(2)} MW</b> into heat from lights, pumps and plant on standby. Tunnel fans are off.`;
+  if (S.load === 1) return `Off-peak: a train every ${(60 / L.tph).toFixed(0)} minutes. Each one shoves a slug of air ahead of it (the piston effect). The tunnel fans stay off; the air breathes in and out through the open DRD and shaft dampers.`;
+  return `Peak: a train every ${(60 / L.tph).toFixed(0)} minutes and <b>${V.heat.toFixed(1)} MW</b> of heat. The tunnel fans are still off: the piston effect does the work. The over-track exhaust pulls brake heat out before it reaches the platform (<b>${V.platT.toFixed(0)}°C</b>).`;
+}
+const TAGTXT = { code: 'CODE', prac: 'PRACTICE', illus: 'ILLUSTRATIVE', inf: 'INFERRED', open: 'OPEN' };
+const tag = k => `<span class="tag ${k}">${TAGTXT[k]}</span>`;// value() → string shown in the status column; refs are clause ids, not quotes
+const CHECKS = [
+  ['Full mode within 180 s', 'NFPA 130 (2017) 7.2.1(3)', 'code', () => S.inc !== 'fire' ? '—' : S.fullAt !== null ? `${S.fullAt} s ✓` : S.tOn !== null ? 'running' : 'pending'],
+  ['Airflow ≥ critical velocity', 'NFPA 130 (2017) 7.2.1(2) · value by analysis', 'code', () => S.inc !== 'fire' ? '—' : S.fs >= 1 ? 'design basis' : 'not yet'],
+  ['Airflow held ≥ 1 h (NBC 2026: 2 h)', 'NFPA 130 7.2.1(5) · NBC 2026 J-6.3', 'code', () => 'req.'],
+  ['Fan rating ≥ 150 °C, 1 h', 'NFPA 130 7.3.2.1 · NBC 2026 J-6.4(c): 250 °C, 2 h', 'code', () => 'req.'],
+  ['Congestion start ≈ 46 °C at AC condenser', 'metro operating practice', 'prac', () => S.inc === 'stall' ? (S.tOn !== null ? `at t+${clk(S.tOn)}` : `${V.stallT.toFixed(0)} °C`) : '—'],
+  ['2 reversible TVFs per station end', 'metro practice · plant chain via dampers', 'prac', () => '✓'],
+  ['Train cannot be driven on to a station', 'metro operating practice · first response is to move the train', 'prac', () => S.inc ? 'assumed' : '—'],
+  ['Design fire size (MW)', 'project-specific · not stated', 'open', () => '—'],
+  ['Damper line-up · trains held', 'schematic for illustration', 'inf', () => '—'],
+  ['Screen doors separate trackway smoke from the platform', 'metro practice · not a rated smoke barrier', 'prac', () => S.inc === 'fire' ? 'shown' : '—'],
+  ['Over-track exhaust in an incident', 'no source found · shown local, never into a supplying shaft', 'inf', () => S.inc ? 'held-train heat' : '—'],
+];
+function syncUI() {
+  document.querySelectorAll('#loadRow button').forEach(b => b.classList.toggle('on', +b.dataset.load === S.load));
+  $('bAir').classList.toggle('on', S.airflow); $('bHeat').classList.toggle('on', S.heat); $('bLab').classList.toggle('on', S.labels);
+  $('bStall').classList.toggle('on', S.inc === 'stall'); $('bStall').textContent = S.inc === 'stall' ? 'Clear train' : 'Stall a train';
+  $('bFire').classList.toggle('on', S.inc === 'fire'); $('bFire').textContent = S.inc === 'fire' ? 'Clear fire' : 'Fire on train';
+  $('fireRow').style.display = S.inc === 'fire' ? '' : 'none';
+  $('incAsm').style.display = S.inc ? '' : 'none'; document.body.classList.toggle('inc', !!S.inc);     // the fan scenario only applies when the train cannot move
+  $('bRear').classList.toggle('on', S.fireAt === 'rear'); $('bFront').classList.toggle('on', S.fireAt === 'front');
+  $('bTvs').classList.toggle('on', S.auto); $('bTvs').textContent = S.auto ? 'TVS auto' : 'TVS held off';
+  $('bCam').classList.toggle('on', S.cine);
+}
+function syncTVS(T) {
+  const M = MODES[T.mode];
+  $('mName').textContent = M.name; $('mName').classList.toggle('hot', T.mode === 'emergency' || T.mode === 'hold');
+  $('mRule').innerHTML = M === MODES.normal && S.load === 0 ? 'Fans off, dampers open. No trains, so no piston air: only a weak natural draught through the shafts.' : M.rule; $('mTag').innerHTML = tag(M.tag);
+  const rw = role(T.dir, 'W'), ra = role(T.dir, 'A');
+  const fan = (id, r) => { const e = $(id); e.textContent = r === 'off' ? 'OFF' : `${r === 'supply' ? 'SUP' : 'EXT'} ${Math.round(S.fs * 100)}%`; e.className = r === 'supply' ? 'sup' : r === 'extract' ? 'ext' : ''; };
+  fan('fW', rw); fan('fA', ra); fan('fE', 'off');
+  const moving = S.tOn !== null && S.tSim >= S.tOn && S.tSim < S.tOn + T_DMP;
+  for (const [end, r] of [['W', rw], ['E', 'off']]) for (const k in PLANT[end].d) {
+    const st = LINEUP[r][k], mv = end === 'W' && moving && st !== LINEUP.off[k];
+    PLANT[end].d[k].material = DMP_MAT[mv ? 'm' : st];
+  }
+  if ($('how').style.display === 'block') $('chk').innerHTML = CHECKS.map(([k, ref, t, v]) => `<tr><td>${k}<small>${ref}</small></td><td class="v">${v()}</td><td class="t">${tag(t)}</td></tr>`).join('');
+}
+function resetIncident() { S.tSim = 0; S.tOn = null; S.fullAt = null; S.fs = 0; V.stallT = V.tunT; }
+const act = {
+  load: n => { S.load = n; syncUI(); },
+  air: () => { S.airflow = !S.airflow; syncUI(); },
+  heat: () => { S.heat = !S.heat; syncUI(); },
+  labels: () => { S.labels = !S.labels; syncUI(); },
+  stall: () => { const was = !!S.inc; S.inc = S.inc === 'stall' ? null : 'stall'; resetIncident(); if (S.inc && S.load === 0) S.load = 1; if (was !== !!S.inc) aimCamera(); syncUI(); },
+  fire: () => { const was = !!S.inc; S.inc = S.inc === 'fire' ? null : 'fire'; resetIncident(); if (S.inc && S.load === 0) S.load = 1; if (was !== !!S.inc) aimCamera(); syncUI(); },
+  fireAt: (e) => { S.fireAt = e ?? (S.fireAt === 'rear' ? 'front' : 'rear'); if (S.inc === 'fire') resetIncident(); syncUI(); },
+  tvs: () => { S.auto = !S.auto; S.tOn = null; S.fullAt = null; syncUI(); },
+  cam: () => { S.cine = !S.cine; controls.autoRotate = S.cine; syncUI(); },
+  how: (v) => { $('how').style.display = (v ?? $('how').style.display !== 'block') ? 'block' : 'none'; },
+  tab: (t) => { const ch = S.tab !== t; S.tab = t; if (ch && S.inc === 'fire') aimCamera(); $('pVent').style.display = t === 'egr' ? 'none' : ''; $('pEgr').style.display = t === 'egr' ? '' : 'none'; $('tVent').classList.toggle('on', t !== 'egr'); $('tEgr').classList.toggle('on', t === 'egr'); },
+};
+document.querySelectorAll('#loadRow button').forEach(b => b.onclick = () => act.load(+b.dataset.load));
+$('bAir').onclick = act.air; $('bHeat').onclick = act.heat; $('bLab').onclick = act.labels;
+$('bStall').onclick = act.stall; $('bFire').onclick = act.fire; $('bTvs').onclick = act.tvs; $('bCam').onclick = act.cam;
+$('bRear').onclick = () => act.fireAt('rear'); $('bFront').onclick = () => act.fireAt('front');
+$('bHow').onclick = () => act.how(); $('tVent').onclick = () => act.tab('vent'); $('tEgr').onclick = () => act.tab('egr'); $('howX').onclick = () => act.how(false);
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if ('123'.includes(k)) act.load(+k - 1);
+  else ({ f: act.air, t: act.heat, l: act.labels, o: act.stall, x: act.fire, r: () => act.fireAt(), g: act.tvs, c: act.cam, h: () => act.how(), p: () => TOUR.on ? tourStop() : tourStart(), escape: () => { act.how(false); tourStop(); } })[k]?.();
+});
+controls.autoRotateSpeed = 0.5;
+// an incident eases the view onto the west tunnels + station end; clearing it eases back. Any orbit by the user cancels the ease.
+const HOME = { pos: new THREE.Vector3(-175, 78, 128), tgt: new THREE.Vector3(-55, 5, 0) };
+const INC_VIEW = { pos: new THREE.Vector3(-168, 98, 228), tgt: new THREE.Vector3(-140, 10, -4) };
+const EGR_VIEW = { pos: new THREE.Vector3(6, 56, 96), tgt: new THREE.Vector3(6, 5, -4) };   // egress tab in a fire: close on the station
+let camGoal = null;
+controls.addEventListener('start', () => { camGoal = null; });
+function aimCamera() {
+  if (S.cine) return;
+  const egr = S.inc === 'fire' && S.tab === 'egr', v = egr ? EGR_VIEW : S.inc ? INC_VIEW : HOME, off = v.pos.clone().sub(v.tgt);
+  if (camera.aspect < 1) off.setLength(egr ? 190 : 380);                  // portrait: same pull-back as fitView
+  camGoal = { tgt: v.tgt, pos: v.tgt.clone().add(off) };
+}
+function easeCamera(dt) {
+  if (!camGoal) return;
+  const f = 1 - Math.exp(-dt / 0.6);
+  camera.position.lerp(camGoal.pos, f); controls.target.lerp(camGoal.tgt, f);
+  if (camera.position.distanceTo(camGoal.pos) < 0.3 && controls.target.distanceTo(camGoal.tgt) < 0.3) camGoal = null;
+}
+window.__app = { RIBS, S, V, SM, act, camera, controls, puffU, easeCamera, warm: n => { for (let i = 0; i < n; i++) { updateDots(0.05); updateSmoke(0.05); } },
+  run: n => { for (let i = 0; i < n; i++) { if (S.inc) S.tSim += 0.05 * SIM_K; updateSmoke(0.05); updateEgress(0.05); } syncEgress(); }, EV, egCalc };   // test hook (warm: advance particles headless)
+syncUI();
+fitView();
+
+// ---------- guided tour: one timeline drives the scenario, the camera and the captions.
+// The videos are recorded from this same tour, so a viewer who opens the link sees what the video shows.
+// cam keys: [u (0..1 through the shot), camera position, look-at target], eased between keys.
+let CAP = QS.has('capture');                           // capture mode: frames advance only through __app.step()
+if (CAP) document.body.classList.add('cap');
+const TOUR_SHOTS = [
+  { d: 5, set: () => { tourBase(); for (let k = 0; k < 120; k++) { updateDots(0.05); updateRibbons(0.05); } },
+    cap: 'What keeps an underground station breathing?',
+    cam: [[0, [-20, 190, 330], [-30, 40, -10]], [1, [-150, 80, 135], [-50, 6, 0]]] },
+  { d: 10, set: () => {},
+    cap: 'Every train pushes air like a piston. Station AC carries away the heat from people and trains.',
+    cam: [[0, [-58, 24, 48], [-14, 5, -5]], [1, [12, 20, 46], [-4, 5, -5]]] },
+  { d: 5, set: () => act.load(0),
+    cap: 'Night: no trains, no passengers. The public-area AC is off.',
+    cam: [[0, [-112, 50, 96], [-30, 6, -4]], [1, [-100, 44, 84], [-30, 6, -4]]] },
+  { d: 13, set: () => { act.load(2); if (S.inc !== 'stall') act.stall(); V.stallT = 45.8; SIM_K = 12; },
+    cap: 'A train stops in the tunnel. One station pushes, the other pulls, so fresh air sweeps the train.',
+    cam: [[0, [-175, 95, 225], [-140, 10, -4]], [1, [-150, 40, 108], [-138, 6, -6]]] },
+  { d: 12, set: () => { S.fireAt = 'rear'; if (S.inc !== 'fire') act.fire(); SIM_K = 12; },
+    cap: 'Fire on a train. Dampers switch and the fans push the smoke away from the escape route.',
+    cam: [[0, [-56, 26, 40], [-76, 9, -8]], [0.3, [-56, 26, 40], [-76, 9, -8]], [1, [-155, 58, 150], [-150, 6, -4]]] },
+  { d: 6, set: () => { if (S.auto) act.tvs(); },
+    cap: 'Without the fans, smoke spreads both ways under the tunnel crown.',
+    cam: [[0, [-158, 62, 158], [-152, 6, -4]], [1, [-162, 70, 178], [-150, 6, -4]]] },
+  { d: 12, set: () => { if (!S.auto) act.tvs(); act.fireAt('rear'); act.tab('egr'); SIM_K = 24; },
+    cap: 'Evacuation: platform, stairs, concourse, street. Timed against the clearance limits.',
+    cam: [[0, [6, 56, 96], [6, 5, -4]], [1, [-2, 68, 82], [0, 4, -5]]] },
+  { d: 5, end: true, set: () => tourBase(),
+    cap: 'Built by Michael Daimei with Claude<br>One HTML file · three.js<small>Generic station · illustrative values, not design data · not CFD</small>',
+    cam: [[0, [-175, 78, 128], [-55, 5, 0]], [1, [-205, 92, 152], [-55, 5, 0]]] },
+];
+const TOUR = { on: false, t: 0, i: -1, u: 0, sh: null, save: null, T: TOUR_SHOTS.reduce((a, x) => a + x.d, 0) };
+function tourFov(a) { return a < 0.9 ? 60 : a < 1.5 ? 45 : 36; }
+function tourK(a) { return a < 0.9 ? 1.25 : a < 1.5 ? 1.12 : 1; }   // pull back on narrower formats so the subject stays in frame
+function tourBase() {
+  if (S.inc) { S.inc = null; resetIncident(); }
+  S.auto = true; SIM_K = 6; S.load = 2; S.labels = false; S.airflow = true; S.heat = false;
+  act.tab('vent'); syncUI(); camGoal = null;
+}
+function tourStart() {
+  if (TOUR.on) return;
+  TOUR.save = { load: S.load, labels: S.labels, airflow: S.airflow, heat: S.heat };
+  if (S.cine) act.cam();
+  Object.assign(TOUR, { on: true, t: 0, i: -1 });
+  act.how(false); document.body.classList.add('tour'); controls.enabled = false; fitView();
+}
+function tourStop() {
+  if (!TOUR.on) return;
+  TOUR.on = false; document.body.classList.remove('tour', 'tegr'); controls.enabled = true;
+  tourBase(); Object.assign(S, TOUR.save); syncUI();
+  camera.position.copy(HOME.pos); controls.target.copy(HOME.tgt); fitView();
+}
+function tourTick(dt) {
+  TOUR.t += dt; document.body.classList.toggle('tegr', S.tab === 'egr');   // tour shows the evacuation clock only in the egress shot
+  if (TOUR.t >= TOUR.T) { if (!CAP) return tourStop(); TOUR.t = TOUR.T - 1e-4; }   // a recording holds the end card
+  let a = 0, i = 0;
+  while (i < TOUR_SHOTS.length - 1 && TOUR.t >= a + TOUR_SHOTS[i].d) a += TOUR_SHOTS[i++].d;
+  const sh = TOUR_SHOTS[i];
+  if (i !== TOUR.i) { TOUR.i = i; sh.set(); $('tCap').innerHTML = sh.cap; $('tCap').classList.toggle('end', !!sh.end); }
+  camGoal = null; TOUR.sh = sh; TOUR.u = (TOUR.t - a) / sh.d;
+  const last = i === TOUR_SHOTS.length - 1;
+  $('tCap').style.opacity = Math.max(0, Math.min(1, (TOUR.t - a) / 0.5, last ? 1 : (a + sh.d - TOUR.t) / 0.35));
+  $('tBar').style.width = (100 * TOUR.t / TOUR.T).toFixed(2) + '%';
+}
+const _tp = new THREE.Vector3(), _tt = new THREE.Vector3(), _tq = new THREE.Vector3();
+function tourCam() {
+  const K = TOUR.sh.cam, u = TOUR.u; let j = 0;
+  while (j < K.length - 2 && u > K[j + 1][0]) j++;
+  const [u0, p0, t0] = K[j], [u1, p1, t1] = K[Math.min(j + 1, K.length - 1)];
+  const f = u1 > u0 ? sstep(u0, u1, u) : 0;
+  _tp.set(...p0).lerp(_tq.set(...p1), f); _tt.set(...t0).lerp(_tq.set(...t1), f);
+  _tp.sub(_tt).multiplyScalar(tourK(camera.aspect)).add(_tt);
+  camera.position.copy(_tp); controls.target.copy(_tt); camera.lookAt(_tt);
+}
+$('bTour').onclick = tourStart; $('tExit').onclick = tourStop;
+canvas.addEventListener('pointerdown', () => { if (TOUR.on && !CAP) tourStop(); });   // grabbing the model hands the camera back
+Object.assign(window.__app, {
+  TOUR, tourStart, tourStop,
+  capture: on => { CAP = on; document.body.classList.toggle('cap', on); },
+  step: (dt = 1 / 30, n = 1) => { for (let i = 0; i < n; i++) tick(dt, i === n - 1); },   // deterministic: n ticks, render the last
+});
+
+// ---------- loop ----------
+const clock = new THREE.Clock();
+function smooth(cur, tgt, dt, tau) { return cur + (tgt - cur) * (1 - Math.exp(-dt / tau)); }
+function frame() {
+  const d = Math.min(clock.getDelta(), 0.05);
+  if (!CAP) tick(S.freeze ? 0 : d);
+  requestAnimationFrame(frame);
+}
+function tick(dt, draw = true) {
+  S.t += dt;
+  if (TOUR.on) tourTick(dt);
+  // incident clock + control logic
+  if (S.inc) {
+    S.tSim += dt * SIM_K;
+    if (S.auto && S.tOn === null) {
+      if (S.inc === 'fire') S.tOn = Math.max(T_DET, S.tSim);
+      else if (V.stallT >= TRIG - 0.3) S.tOn = S.tSim;
+    }
+  }
+  S.fs = S.tOn === null ? 0 : Math.min(1, Math.max(0, (S.tSim - S.tOn - T_DMP) / T_FAN));
+  if (S.fs >= 1 && S.fullAt === null) S.fullAt = Math.round(S.tSim - S.tOn);
+  const TV = tvs();
+  const T = targets();
+  V.heat = smooth(V.heat, T.heat, dt, 1.5);
+  V.platT = smooth(V.platT, T.platT, dt, 3);
+  V.tunT = smooth(V.tunT, T.tunT, dt, 3);
+  V.stallT = smooth(V.stallT, T.stallT, dt, S.inc && S.fs === 0 ? 5 : 3);
+  V.air = smooth(V.air, T.air, dt, 1.5);
+
+  updateTrains(dt);
+  updateFire();
+  updateStallBloom();
+  puffU.uTime.value = S.t;
+  updateVertical(dt);
+  updateDots(dt);
+  updateRibbons(dt);
+  updateSmoke(dt);
+  updateEgress(dt);
+  // fans: off in normal service [M01]; supply spins +, extract spins − (reversible)
+  const w = { off: 0, supply: 1, extract: -1 };
+  for (const [end, r] of [['W', role(TV.dir, 'W')], ['AW', role(TV.dir, 'A')], ['E', 'off'], ['AE', 'off']])
+    for (const f of PLANT[end].fans) f.rotation.y += w[r] * 16 * S.fs * dt;
+  syncTVS(TV);
+
+  for (const g of tunnelGlow) g.visible = S.heat;
+  tempColor(V.stallT, glowAW.material.color);
+  for (const g of [glowBW, glowAE, glowBE]) tempColor(V.tunT, g.material.color);
+  heatPlat.visible = heatConc.visible = S.heat;
+  heatPlat.material.opacity = heatConc.material.opacity = airOn() ? 0.16 : 0.42;   // let the flow read over the tint
+  for (const g of tunnelGlow) g.material.opacity = airOn() ? 0.14 : 0.35;
+  const nPax = LOADS[S.load].pax / 18;
+  if (!EV.started) {                                    // counts freeze once the evacuation starts
+    paxPlat.count = Math.min(PAX_MAX, Math.round(nPax * (S.inc ? 1.7 : 1)));
+    paxConc.count = Math.min(PAX_MAX, Math.round(nPax * (S.inc ? 1.25 : 1)));
+  }
+  tempColor(V.platT, heatPlat.material.color); tempColor(V.platT - 1.5, heatConc.material.color);
+
+  $('sHeat').textContent = V.heat.toFixed(2);
+  $('sAir').textContent = V.air.toFixed(1);
+  $('sClk').textContent = S.inc ? clk(S.tSim) : '–';
+  $('cap').innerHTML = caption(TV);
+  syncEgress();
+
+  if (TOUR.on) tourCam(); else { easeCamera(dt); controls.update(); }
+  updateLabels();
+  if (draw) composer.render();
+}
+addEventListener('resize', fitView);
+if (QS.has('tour')) tourStart();
+frame();
+</script>
+</body>
+</html>
